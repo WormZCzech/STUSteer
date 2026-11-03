@@ -1,0 +1,26 @@
+[project]
+name = "stusteer"
+version = "0.1.0"
+description = "An Android phone as steering wheel, gamepad and LSPDFR button box for GTA V Legacy."
+readme = "README.md"
+requires-python = ">=3.11"
+# The core needs only the standard library. The extras are what the real (non-dry-run) receiver
+# uses on Windows; each is a download you approve (see README, "What you install").
+dependencies = []
+
+[project.optional-dependencies]
+windows = ["vgamepad"]
+https = ["cryptography"]
+
+[project.scripts]
+stusteer = "stusteer.__main__:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["stusteer*"]
+
+[tool.setuptools.package-data]
+stusteer = ["web/*", "profiles/*.json"]
