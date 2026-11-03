@@ -7,7 +7,7 @@ anywhere else; STUSteer never touches the game folder.
     pin.txt                  the 6-digit pairing PIN the phone must send
     ca.crt / ca.key          the local certificate authority (only for HTTPS, see certs.py)
     server.crt / server.key  the receiver's HTTPS certificate, signed by that CA
-    tuning-<profile>.json    curve changes saved from the phone's tuning panel
+    tuning-<profile>.json    curve and option changes saved from the phone's tuning panel
 """
 
 from __future__ import annotations
@@ -54,7 +54,11 @@ def load_pin(folder: Path, regenerate: bool = False) -> str:
 
 
 class TuningStore:
-    """Curve overrides saved from the phone, one JSON file per profile."""
+    """Curve and option changes saved from the phone, one JSON file per profile.
+
+    {"schema": 2, "curves": {"phone/gas": {"shape": "linear"}}, "options": {"phone/gas": {"mode": "relative"}}}
+    Keys are "device/control"; only the fields that differ from the profile are stored.
+    """
 
     def __init__(self, folder: Path, profile_stem: str) -> None:
         self.path = folder / f"tuning-{profile_stem}.json"
@@ -66,7 +70,10 @@ class TuningStore:
             data = json.loads(self.path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             return {}
-        return data.get("curves", {}) if isinstance(data, dict) else {}
+        if not isinstance(data, dict) or data.get("schema") != 2:
+            return {}  # an older format: ignored, the profile's own values apply
+        return {"curves": data.get("curves") or {}, "options": data.get("options") or {}}
 
-    def save(self, curves: dict[str, dict[str, Any]]) -> None:
-        write_atomic(self.path, json.dumps({"schema": 1, "curves": curves}, indent=2, sort_keys=True) + "\n")
+    def save(self, curves: dict[str, dict[str, Any]], options: dict[str, dict[str, Any]]) -> None:
+        text = json.dumps({"schema": 2, "curves": curves, "options": options}, indent=2, sort_keys=True)
+        write_atomic(self.path, text + "\n")

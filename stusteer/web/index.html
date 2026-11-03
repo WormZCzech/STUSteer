@@ -53,12 +53,18 @@
       <label class="row"><input type="checkbox" id="opt-haptics"> Vibrate on button press</label>
 
       <h3>Tuning (applied on the PC, live)</h3>
+      <p class="small">Changes apply at once; Save on PC keeps them for next time.</p>
       <label class="row">Control <select id="tune-id"></select></label>
       <div id="tune-fields"></div>
       <div class="row">
         <button id="tune-reset">Reset to profile</button>
         <button id="tune-save" class="primary">Save on PC</button>
       </div>
+
+      <h3>Touch probe</h3>
+      <p class="small">Press here with a fingertip, then flatten your thumb, to see whether this screen reports pressure or contact size.</p>
+      <div id="probe-area">touch here</div>
+      <p id="probe-out" class="small">No touch yet.</p>
 
       <h3>Connection</h3>
       <p id="conn-info" class="small"></p>

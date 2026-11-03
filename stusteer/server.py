@@ -3,22 +3,24 @@
 One asyncio event loop does everything on one thread, so the controller needs no locks:
 
 - an HTTP(S) server: GET / and the files in stusteer/web/ (the phone app), GET /ca.crt;
-- GET /ws?pin=NNNNNN with "Upgrade: websocket": the controller session. A wrong PIN is refused, and
-  five wrong PINs from one address within a minute block it for a minute;
-- a 10 ms ticker that runs the controller's watchdog and deferred key releases.
+- GET /ws?pin=NNNNNN&device=<id> with "Upgrade: websocket": a device session (device defaults to
+  the first phone in the profile). A wrong PIN is refused, and five wrong PINs from one address
+  within a minute block it for a minute;
+- a 10 ms ticker that runs the controller's watchdogs and deferred key releases.
 
-Only one phone controls the PC at a time: a new connection takes over and the old one is closed.
+Each device has at most one session: a new connection for the same device takes over and the old
+one is closed. Different devices (the phone and a button box) are connected at the same time.
 
-Messages (JSON text frames). Phone -> PC:
+Messages (JSON text frames). Device -> PC:
     {"t":"s", "seq":17, "layout":"drive", "c":{"wheel":-12.5, "gas":0.8, "horn":1}}   snapshot
     {"t":"ping", "id":5}                                  round-trip probe; answered with outputs
-    {"t":"tune", "id":"wheel", "curve":{"range":70}}      change a curve live
-    {"t":"tune_reset", "id":"wheel"}                      back to the profile's curve
+    {"t":"tune", "id":"gas", "curve":{"shape":"scurve"}, "options":{"mode":"relative"}}   live change
+    {"t":"tune_reset", "id":"gas"}                        back to the profile's curve and options
     {"t":"save"}                                          keep the tuning for next time
-PC -> phone:
-    {"t":"welcome", "version":1, "profile":{...}}         after the PIN is accepted
-    {"t":"pong", "id":5, "out":{"axes":{...}, "buttons":[...], "keys":[...]}}
-    {"t":"tuned", "id":"wheel", "curve":{...}}  /  {"t":"saved", "path":"..."}  /  {"t":"error", ...}
+PC -> device:
+    {"t":"welcome", "version":2, "device":{"id","type"}, "profile":{...}}   after the PIN check
+    {"t":"pong", "id":5, "out":{"axes":{...}, "buttons":[...], "keys":[...], "devices":[...]}}
+    {"t":"tuned", "id":"gas", "curve":{...}, "options":{...}}  /  {"t":"saved", ...}  /  {"t":"error", ...}
 """
 
 from __future__ import annotations
@@ -39,10 +41,11 @@ from urllib.parse import parse_qs, urlsplit
 from .config import TuningStore
 from .controller import Controller
 from .mapping import Curve
+from .profile import Control, check_options
 from .websocket import ConnectionClosed, WebSocket, accept_key
 
 log = logging.getLogger("stusteer.server")
-PROTOCOL_VERSION = 1
+PROTOCOL_VERSION = 2
 WEB_FILES = {
     "/": ("index.html", "text/html; charset=utf-8"),
     "/index.html": ("index.html", "text/html; charset=utf-8"),
@@ -77,18 +80,15 @@ class Receiver:
         self._web_dir = web_dir
         self._ca_cert = ca_cert
         self._clock = clock
-        self._active: WebSocket | None = None
+        self._sessions: dict[str, WebSocket] = {}
         self._failures: dict[str, deque[float]] = defaultdict(deque)
-        # The profile's own curves, kept for "reset"; then the saved tuning goes on top of them.
+        # The profile's own curves and options, kept for "reset"; the saved tuning goes on top.
         profile = controller.profile
-        self._profile_curves = {cid: c.curve for cid, c in profile.controls.items() if c.curve}
-        saved = tuning.load()
-        for warning in profile.apply_tuning(saved):
+        controls = [c for d in profile.devices.values() for c in d.controls.values()]
+        self._base_curves = {c.address: c.curve for c in controls if c.curve}
+        self._base_options = {c.address: dict(c.options) for c in controls}
+        for warning in profile.apply_tuning(tuning.load()):
             log.warning("%s", warning)
-        self._tuned: dict[str, dict[str, Any]] = {
-            cid: changes for cid, changes in saved.items()
-            if cid in self._profile_curves and profile.controls[cid].curve != self._profile_curves[cid]
-        }
 
     # -- serving -------------------------------------------------------------------------------
 
@@ -166,6 +166,11 @@ class Receiver:
         status = self._check_pin(request, ip)
         if status != 200:
             return await _respond(writer, status, b"refused")
+        requested = (request.query.get("device") or [None])[0]
+        device = self.controller.profile.device(requested)
+        if device is None:
+            log.warning("refused %s: no enabled device '%s' in the profile", ip, requested or "(default phone)")
+            return await _respond(writer, 404, b"no such device")
         key = request.headers.get("sec-websocket-key")
         if request.headers.get("upgrade", "").lower() != "websocket" or not key:
             return await _respond(writer, 400, b"expected a WebSocket upgrade")
@@ -177,32 +182,34 @@ class Receiver:
         )
         await writer.drain()
         ws = WebSocket(reader, writer)
-        if self._active is not None:
-            log.info("a new phone connection takes over")
-            await self._active.close(4000)
-        self._active = ws
-        self.controller.neutralize(self._clock())
-        log.info("phone connected from %s (%s)", ip, request.headers.get("user-agent", "?")[:80])
+        old = self._sessions.get(device.id)
+        if old is not None:
+            log.info("%s: a new connection takes over", device.id)
+            await old.close(4000)
+        self._sessions[device.id] = ws
+        self.controller.neutralize(device.id, self._clock())
+        log.info("%s connected from %s (%s)", device.id, ip, request.headers.get("user-agent", "?")[:80])
         try:
-            await ws.send_text(
-                json.dumps({"t": "welcome", "version": PROTOCOL_VERSION, "profile": self.controller.profile.to_client()})
-            )
+            await ws.send_text(json.dumps({
+                "t": "welcome", "version": PROTOCOL_VERSION,
+                "device": {"id": device.id, "type": device.type}, "profile": device.to_client(),
+            }))
             while True:
                 message = await ws.recv()
                 if isinstance(message, str):
-                    reply = self.handle_message(message)
+                    reply = self.handle_message(message, device.id)
                     if reply is not None:
                         await ws.send_text(json.dumps(reply))
         except ConnectionClosed as exc:
-            log.info("phone disconnected (%s)", exc)
+            log.info("%s disconnected (%s)", device.id, exc)
         finally:
-            if self._active is ws:
-                self._active = None
-                self.controller.neutralize(self._clock())
+            if self._sessions.get(device.id) is ws:
+                del self._sessions[device.id]
+                self.controller.neutralize(device.id, self._clock())
             await ws.close()
 
-    def handle_message(self, text: str) -> dict[str, Any] | None:
-        """Handle one message from the phone; return the reply, if any. Never raises on bad input."""
+    def handle_message(self, text: str, device_id: str = "phone") -> dict[str, Any] | None:
+        """Handle one message from a device; return the reply, if any. Never raises on bad input."""
         try:
             msg = json.loads(text)
         except json.JSONDecodeError:
@@ -214,41 +221,75 @@ class Receiver:
             values = msg.get("c")
             if isinstance(values, dict):
                 layout = msg.get("layout") if isinstance(msg.get("layout"), str) else None
-                self.controller.apply(values, self._clock(), layout)
+                self.controller.apply(device_id, values, self._clock(), layout)
             return None
         if kind == "ping":
             return {"t": "pong", "id": msg.get("id"), "out": self.controller.outputs()}
+        control = self._control(device_id, msg.get("id"))
         if kind == "tune":
-            return self._tune(msg.get("id"), msg.get("curve"))
+            if control is None:
+                return {"t": "error", "error": f"no control '{msg.get('id')}'"}
+            return self._tune(control, msg.get("curve"), msg.get("options"))
         if kind == "tune_reset":
-            control_id = msg.get("id")
-            if control_id in self._profile_curves:
-                self.controller.profile.controls[control_id].curve = self._profile_curves[control_id]
-                self._tuned.pop(control_id, None)
-                return {"t": "tuned", "id": control_id, "curve": self._profile_curves[control_id].to_dict()}
-            return {"t": "error", "error": f"no curve for '{control_id}'"}
+            if control is None:
+                return {"t": "error", "error": f"no control '{msg.get('id')}'"}
+            control.curve = self._base_curves.get(control.address)
+            control.options = dict(self._base_options[control.address])
+            return self._tuned_reply(control)
         if kind == "save":
-            self._tuning.save(self._tuned)
+            curves, options = {}, {}
+            for address, base in self._base_curves.items():
+                current = self.controller.profile.control(address).curve
+                diff = {k: v for k, v in current.to_dict().items() if base.to_dict().get(k) != v}
+                if diff:
+                    curves[address] = diff
+            for address, base in self._base_options.items():
+                current = self.controller.profile.control(address).options
+                diff = {k: v for k, v in current.items() if base.get(k) != v}
+                if diff:
+                    options[address] = diff
+            self._tuning.save(curves, options)
             log.info("tuning saved to %s", self._tuning.path)
             return {"t": "saved", "path": str(self._tuning.path)}
         return {"t": "error", "error": f"unknown message type {kind!r}"}
 
-    def _tune(self, control_id: Any, changes: Any) -> dict[str, Any]:
-        control = self.controller.profile.controls.get(control_id) if isinstance(control_id, str) else None
-        if control is None or control.curve is None or not isinstance(changes, dict):
-            return {"t": "error", "error": f"cannot tune '{control_id}'"}
-        try:
-            curve: Curve = control.curve.updated(changes)
-        except (KeyError, ValueError, TypeError) as exc:
-            return {"t": "error", "error": f"bad curve field: {exc}"}
-        problems = curve.validate()
-        if problems:
-            return {"t": "error", "error": "; ".join(problems)}
+    def _control(self, device_id: str, control_id: Any) -> Control | None:
+        device = self.controller.profile.devices.get(device_id)
+        if device is None or not isinstance(control_id, str):
+            return None
+        return device.controls.get(control_id)
+
+    @staticmethod
+    def _tuned_reply(control: Control) -> dict[str, Any]:
+        return {
+            "t": "tuned", "id": control.id,
+            "curve": control.curve.to_dict() if control.curve else None, "options": dict(control.options),
+        }
+
+    def _tune(self, control: Control, curve_changes: Any, option_changes: Any) -> dict[str, Any]:
+        """Apply live changes to a control's curve and options; all or nothing."""
+        curve: Curve | None = control.curve
+        if curve_changes is not None:
+            if curve is None or not isinstance(curve_changes, dict):
+                return {"t": "error", "error": f"'{control.id}' has no curve"}
+            try:
+                curve = curve.updated(curve_changes)
+            except (KeyError, ValueError, TypeError) as exc:
+                return {"t": "error", "error": f"bad curve field: {exc}"}
+            problems = curve.validate()
+            if problems:
+                return {"t": "error", "error": "; ".join(problems)}
+        options: dict[str, Any] = {}
+        if option_changes is not None:
+            if not isinstance(option_changes, dict):
+                return {"t": "error", "error": "options must be an object"}
+            options, problems = check_options(control.type, option_changes)
+            if problems:
+                return {"t": "error", "error": "; ".join(problems)}
         control.curve = curve
-        base = self._profile_curves[control_id].to_dict()
-        self._tuned[control_id] = {k: v for k, v in curve.to_dict().items() if base.get(k) != v}
-        log.info("tuned %s: %s", control_id, self._tuned[control_id])
-        return {"t": "tuned", "id": control_id, "curve": curve.to_dict()}
+        control.options.update(options)
+        log.info("tuned %s: curve=%s options=%s", control.address, curve_changes or {}, options)
+        return self._tuned_reply(control)
 
 
 async def _read_request(reader: asyncio.StreamReader) -> Request | None:

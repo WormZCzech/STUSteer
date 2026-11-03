@@ -122,7 +122,8 @@ function check(ok, text) {
     await touch('touchStart', [{ x: gas.x, y: gy, id: 1 }]);
     await waitFor(() => axis(lastPad(rx.log), 'RT') > 0.5, 'the gas pedal');
     const rt = axis(lastPad(rx.log), 'RT');
-    check(Math.abs(rt - (0.75 - 0.02) / 0.98) < 0.04, `gas pedal at 75 % -> RT ${rt.toFixed(3)}`);
+    const t75 = (0.75 - 0.02) / 0.98, s75 = t75 * t75 * (3 - 2 * t75); // default S-curve
+    check(Math.abs(rt - s75) < 0.04, `gas pedal (thumb height) at 75 % -> RT ${rt.toFixed(3)} (S-curve, expected ~${s75.toFixed(3)})`);
 
     // While still on the gas, a second finger taps Handbrake (multitouch).
     const hb = await centre('text=Handbrake');
@@ -182,20 +183,41 @@ function check(ok, text) {
     await page.waitForSelector('#settings:not([hidden])');
     await page.selectOption('#tune-id', 't_wheel');
     await page.locator('#tune-fields input[type=range]').first().fill('120');
-    await waitFor(() => rx.log.some((l) => l.includes("tuned t_wheel: {'range': 120.0}")), 'the tune message');
+    await waitFor(() => rx.log.some((l) => l.includes("tuned phone/t_wheel: curve={'range': 120}")), 'the tune message');
     check(true, 'tuning slider changes the curve on the PC live');
-    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, '6-settings.png') });
     await page.click('#settings-close');
 
-    // Watchdog: hold the gas, then the phone goes silent (browser frozen, Wi-Fi lost).
+    // Pedal B mode: switch the gas pedal to "slide from touch" in the tuning panel.
     await page.click('#tabs button:has-text("Drive (tilt)")');
-    const gas2 = await centre('.type-pedal.accent-green');
-    await touch('touchStart', [{ x: gas2.x, y: gas2.b.y + 5, id: 7 }]);
-    await waitFor(() => axis(lastPad(rx.log), 'RT') > 0.9, 'full gas');
+    await page.click('#btn-settings');
+    await page.selectOption('#tune-id', 'gas');
+    await page.locator('#tune-fields select').first().selectOption('relative');
+    await waitFor(() => rx.log.some((l) => l.includes("tuned phone/gas: curve={} options={'mode': 'relative'}")), 'mode change');
+    await page.waitForSelector('#tune-fields input[type=range]');
+    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, '6-settings.png') });
+    await page.click('#settings-close');
+    const g3 = await centre('.type-pedal.accent-green');
+    const top = g3.b.y + g3.b.height * 0.2; // the thumb lands high, where thumb-height mode gives ~80 %
+    await touch('touchStart', [{ x: g3.x, y: top, id: 8 }]);
+    await sleep(80);
+    check(axis(lastPad(rx.log), 'RT') === 0, 'slide-from-touch: landing high on the pedal starts at 0 (no jump)');
+    const g3b = await centre('.type-pedal.accent-green');
+    await touch('touchStart', [{ x: g3.x, y: g3b.b.y + 4, id: 8 }]); // slide up as far as it goes
+    await touch('touchMove', [{ x: g3.x, y: g3b.b.y + 4, id: 8 }]);
+    await waitFor(() => axis(lastPad(rx.log), 'RT') > 0.2, 'relative travel');
+    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, '7-relative-pedal.png') });
+    await touch('touchEnd', []);
+    await waitFor(() => axis(lastPad(rx.log), 'RT') === 0, 'release');
+    check(true, 'slide-from-touch: sliding up from the touch point raises RT, lifting releases it');
+
+    // Watchdog: hold the handbrake, then the phone goes silent (browser frozen, Wi-Fi lost).
+    const hb2 = await centre('text=Handbrake');
+    await touch('touchStart', [{ x: hb2.x, y: hb2.y, id: 7 }]);
+    await waitFor(() => lastPad(rx.log).includes('buttons=[RB]'), 'handbrake held');
     await cdp.send('Emulation.setScriptExecutionDisabled', { value: true }).catch(() => {});
     await page.evaluate(() => { window.__stusteer.state.ws.send = () => {}; }).catch(() => {});
     await waitFor(() => rx.log.some((l) => l.includes('releasing everything')), 'the watchdog', 3000);
-    check(axis(lastPad(rx.log), 'RT') === 0, 'watchdog: phone goes silent with the gas held -> released within 0.5 s');
+    check(lastPad(rx.log).includes('buttons=[]'), 'watchdog: phone goes silent with the handbrake held -> released within 0.5 s');
     check(errors.length === 0, 'no JavaScript errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
   } catch (e) {
     check(false, String(e && e.stack || e));

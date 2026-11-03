@@ -54,7 +54,16 @@ in-game LSPDFR key-binding menu. STUSteer does not read that file; change the pr
 
 Plugins (StopThePed, Ultimate Backup, Policing Redefined…) bring their own keys. Add a button per
 action to the LSPDFR layout: `{"id": "stp_menu", "type": "button", "label": "STP menu", "x": …,
-"bind": {"key": ["LCTRL", "N"]}}`; key names are in `stusteer/keys.py`.
+"bind": {"key": ["LCTRL", "N"]}}`; `python -m stusteer keys` lists the key names.
+
+**Clash-free keys:** F13–F24 exist on no normal keyboard. Set a plugin's action to, say, `F15` in its
+ini file and bind a STUSteer button to `{"key": "F15"}`; nothing else in GTA V reacts to it. RAGE
+Plugin Hook reads keys by .NET `Keys` names, which include F13–F24 [I]; check each plugin's ini
+accepts them [VERIFY].
+
+**Keyboard layout:** key names mean the key that *types* that character on your active layout. On
+Czech QWERTZ, `Y` presses the key labelled Y (the US "Z" position), which is what LSPDFR's `Y`
+means too.
 
 ## Keyboard and controller together
 

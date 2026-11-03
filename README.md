@@ -3,11 +3,16 @@
 Your Android phone as a **steering wheel, gamepad and LSPDFR button box** for GTA V Legacy. It's my
 own take on [RojX](https://rojx.io/) (study: `docs/rojx-study.md`), built around GTA V + LSPDFR.
 
-- **Tilt steering** (gravity + gyro fusion) or a **touch wheel**, analog **gas and brake** pedals,
+- **Tilt steering** (gravity + gyro fusion) or a **touch wheel**, analog **gas and brake** pedals
+  (thumb height or slide-from-touch, with selectable response curves; S-curve by default),
   handbrake, horn/siren, lights, camera.
 - **LSPDFR keys on the same screen**: accept/end callout, traffic stop, backup, interact, menu
   navigation. These are sent as real keyboard keys, so LSPDFR keeps its default bindings.
 - **On-foot layout** with two sticks, ABXY, bumpers/triggers and a D-pad.
+- **Any key on any button**, including keys no keyboard has (F13–F24), media keys, mouse buttons and
+  raw scan/virtual-key codes. It follows your keyboard layout, so it works on Czech QWERTZ too.
+- **More than the phone**: the PC side is a config framework for several input devices at once. An
+  ESP32 button box on Wi-Fi works today; USB, HID and MIDI boxes are planned (`docs/devices.md`).
 - **Live tuning from the phone**: full-lock angle, deadzone, anti-deadzone, curve, invert. Saved on
   the PC.
 - **Safety**: everything is released if the phone goes quiet for 0.5 s, keys go only to `GTA5.exe`,
@@ -87,34 +92,61 @@ too.
 - **Top bar**: connection dot and round-trip time, layout tabs, *Centre* (sets the current tilt as
   straight ahead), full screen, ⚙ settings.
 - **Drive (tilt)**: hold the phone like a wheel. Brake on the left edge, gas on the right; the
-  higher your thumb on the pedal, the harder you press. The LSPDFR row sits under the wheel.
+  higher your thumb on the pedal, the harder you press. To start from zero wherever your thumb
+  lands instead, switch the pedal to *Slide from touch* in ⚙ (see "Pedals"). The LSPDFR row
+  sits under the wheel.
 - **Drive (touch)**: drag the wheel round instead of tilting (360° lock to lock, springs back).
 - **On foot**: floating sticks (the stick centres where your thumb lands), ABXY, triggers.
 - **LSPDFR**: big buttons for callouts, traffic stop (hold), backup, interact, plus arrows, OK
   and Back for plugin menus.
-- **⚙ Settings**: gyro fusion, tilt smoothing, vibration, and live tuning of every analog control.
-  Changes apply on the PC at once; *Save on PC* keeps them (`%APPDATA%\STUSteer\tuning-*.json`).
+- **⚙ Settings**: gyro fusion, tilt smoothing, vibration, live tuning of every analog control and
+  a touch probe. Changes apply on the PC at once; *Save on PC* keeps them
+  (`%APPDATA%\STUSteer\tuning-*.json`).
+
+### Pedals
+
+| Pedal mode | How it works | Default for |
+| --- | --- | --- |
+| Thumb height (`absolute`) | how high your thumb is on the pedal = how much | gas, brake |
+| Slide from touch (`relative`) | where you touch = 0 %; slide up by *Travel for full* (share of the pedal height) for 100 % | — |
+| On / off (`digital`) | any touch = 100 % | Aim, Shoot (on foot) |
+
+The **response** then bends the value: *S-curve* (default for pedals: gentle start, quick middle,
+easy full throttle), *Linear*, *Gentle start*, *Quick start*, plus deadzone and *Max output* (e.g.
+70 % for calm patrol driving). The tuning panel draws the curve. Can a pedal react to how hard you
+press instead? Not on a Galaxy S24 with a finger; see `docs/touch-pressure.md`, and try ⚙ → *Touch
+probe*.
 
 Steering tips for GTA V: lower *Full lock* (e.g. 40°) for quicker steering, raise it for precision.
 GTA ignores small stick movements itself; if the first few degrees of tilt do nothing, raise
 *Anti-deadzone* to 0.1–0.25. A *Curve* above 1 gives finer control around the centre.
 
-## Changing buttons and layouts
+## Changing buttons, layouts and devices
 
-Everything is in `stusteer/profiles/gta5_lspdfr.json`. Each control has a place on the screen in
-percent (`x`, `y`, `w`, `h`) and a binding:
+Everything is in the profile, `stusteer/profiles/gta5_lspdfr.json`. Full reference:
+`docs/devices.md`. A phone button has a place on the screen in percent (`x`, `y`, `w`, `h`) and a
+binding:
 
 ```json
-{"id": "stp", "type": "button", "label": "STP menu", "hint": "Ctrl+N",
- "x": 66, "y": 2, "w": 10, "h": 30, "bind": {"key": ["LCTRL", "N"]}}
+{"id": "stp", "type": "button", "label": "STP menu", "hint": "F15",
+ "x": 66, "y": 2, "w": 10, "h": 30, "bind": {"key": "F15"}}
 ```
 
-Bindings: `{"pad": "RB"}` (buttons A B X Y LB RB LS RS BACK START GUIDE DPAD_UP/DOWN/LEFT/RIGHT),
-`{"key": "B"}` or a list for a combination (names in `stusteer/keys.py`), `{"axis": "RT"}` for
-pedals and wheels (LX LY RX RY LT RT), `{"stick": "L"}`. Control ids must be unique across the
-whole profile. Restart the receiver after editing; it reports every mistake with its location. To
-keep your own copy elsewhere, use `run --profile my.json`. Check the LSPDFR keys against your
-`lspdfr/keys.ini` (`docs/gta-bindings.md`).
+The binding can be:
+
+- `{"pad": "RB"}`, an Xbox pad button.
+- `{"key": …}`: any key, including F13–F24, media keys, `MOUSE_LEFT`…, raw codes like `"SC:0x64"` /
+  `"VK:0x7E"`, or a list for a combination such as `["LCTRL", "F13"]`. `python -m stusteer keys`
+  lists them all.
+- `{"axis": "RT"}` for pedals and wheels.
+- `{"stick": "L"}`.
+
+Tip: give LSPDFR and plugin actions F13–F24 in their `keys.ini` and bind the same keys here.
+Nothing else in GTA reacts to them.
+
+Restart the receiver after editing; it reports every mistake with its location. To keep your own
+copy elsewhere, use `run --profile my.json`. Check the LSPDFR keys against your `lspdfr/keys.ini`
+(`docs/gta-bindings.md`).
 
 ## Troubleshooting
 
@@ -138,8 +170,9 @@ python -m unittest -v
 node tests/e2e/phone_e2e.js shots
 ```
 
-The unit tests need only Python. The end-to-end test drives the real page in a headless Chromium
+The unit tests (43) need only Python. The end-to-end test drives the real page in a headless Chromium
 posing as a phone, against a dry-run receiver, and writes screenshots to `shots/`. Code map:
-`stusteer/server.py` (network), `controller.py` (timing and safety rules), `mapping.py` (curves),
-`profile.py` (layouts and bindings), `output/` (ViGEm pad, SendInput keyboard, dry run), `web/`
-(the phone app).
+`stusteer/server.py` (network, device sessions), `controller.py` (merging devices, timing and
+safety rules), `mapping.py` (curves), `profile.py` (the config model), `devices.py` (device
+types), `keys.py` (every key), `output/` (ViGEm pad, SendInput keyboard and mouse, dry run),
+`web/` (the phone app).

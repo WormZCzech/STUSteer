@@ -59,7 +59,8 @@ class ReceiverTest(unittest.IsolatedAsyncioTestCase):
         folder = Path(self.tmp.name)
         self.pad, self.kb = DryRunGamepad(), DryRunKeyboard()
         profile = load_profile(PROFILE)
-        profile.settings.key_target_processes = ()
+        profile.outputs.key_targets = ()
+        profile.devices["buttonbox"].enabled = True  # the example ESP32 box, for the multi-device test
         self.controller = Controller(profile, self.pad, self.kb)
         self.pin = load_pin(folder)
         self.receiver = Receiver(self.controller, self.pin, TuningStore(folder, "test"), WEB)
@@ -86,11 +87,12 @@ class ReceiverTest(unittest.IsolatedAsyncioTestCase):
         head, _, body = data.partition(b"\r\n\r\n")
         return int(head.split()[1]), body
 
-    async def open_ws(self, pin: str):
+    async def open_ws(self, pin: str, device: str | None = None):
         reader, writer = await asyncio.open_connection("127.0.0.1", self.port, ssl=self.ssl_client())
         key = base64.b64encode(os.urandom(16)).decode()
+        query = f"pin={pin}" + (f"&device={device}" if device else "")
         writer.write(
-            (f"GET /ws?pin={pin} HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+            (f"GET /ws?{query} HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
              f"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n").encode()
         )
         await writer.drain()
@@ -123,6 +125,7 @@ class ReceiverTest(unittest.IsolatedAsyncioTestCase):
         opcode, payload = await read_frame(reader)
         welcome = json.loads(payload)
         self.assertEqual(welcome["t"], "welcome")
+        self.assertEqual(welcome["device"], {"id": "phone", "type": "phone"})
         self.assertEqual(welcome["profile"]["layouts"][0]["id"], "drive")
 
         await self.send(writer, {"t": "s", "layout": "drive", "c": {"wheel": 30, "gas": 1, "backup": 1}})
@@ -140,10 +143,22 @@ class ReceiverTest(unittest.IsolatedAsyncioTestCase):
         await self.send(writer, {"t": "tune", "id": "wheel", "curve": {"deadzone": 99}})
         _, payload = await read_frame(reader)
         self.assertEqual(json.loads(payload)["t"], "error")
+        await self.send(writer, {"t": "tune", "id": "gas", "curve": {"shape": "linear"}, "options": {"mode": "relative"}})
+        _, payload = await read_frame(reader)
+        tuned = json.loads(payload)
+        self.assertEqual((tuned["curve"]["shape"], tuned["options"]["mode"]), ("linear", "relative"))
+        await self.send(writer, {"t": "tune", "id": "gas", "options": {"mode": "sideways"}})
+        _, payload = await read_frame(reader)
+        self.assertEqual(json.loads(payload)["t"], "error")
         await self.send(writer, {"t": "save"})
         _, payload = await read_frame(reader)
-        saved = json.loads(payload)
-        self.assertEqual(json.loads(Path(saved["path"]).read_text())["curves"], {"wheel": {"range": 40.0}})
+        saved = json.loads(Path(json.loads(payload)["path"]).read_text())
+        self.assertEqual(saved["curves"], {"phone/wheel": {"range": 40.0}, "phone/gas": {"shape": "linear"}})
+        self.assertEqual(saved["options"], {"phone/gas": {"mode": "relative"}})
+        await self.send(writer, {"t": "tune_reset", "id": "gas"})
+        _, payload = await read_frame(reader)
+        reset = json.loads(payload)
+        self.assertEqual((reset["curve"]["shape"], reset["options"]["mode"]), ("scurve", "absolute"))
 
         writer.close()  # the phone vanishes: everything is released
         for _ in range(50):
@@ -153,6 +168,40 @@ class ReceiverTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.controller.outputs()["keys"], [])
         self.assertEqual(self.controller.outputs()["axes"]["RT"], 0.0)
         self.assertEqual(self.kb.history[-1], ("B", False))
+
+    async def test_phone_and_button_box_together(self):
+        p_reader, p_writer, _, _ = await self.open_ws(self.pin)
+        await read_frame(p_reader)
+        b_reader, b_writer, head, _ = await self.open_ws(self.pin, device="buttonbox")
+        self.assertIn(b"101", head)
+        _, payload = await read_frame(b_reader)
+        welcome = json.loads(payload)
+        self.assertEqual(welcome["device"]["type"], "network")
+        self.assertEqual([c["id"] for c in welcome["profile"]["controls"]][:2], ["sw1", "sw2"])
+
+        await self.send(p_writer, {"t": "s", "c": {"backup": 1}})
+        await self.send(b_writer, {"t": "s", "c": {"sw1": 1, "pot": 0.5}})
+        await self.send(b_writer, {"t": "ping", "id": 1})
+        _, payload = await read_frame(b_reader)
+        out = json.loads(payload)["out"]
+        self.assertEqual(out["keys"], ["B", "F13"])
+        self.assertEqual(out["devices"], ["buttonbox", "phone"])
+        self.assertAlmostEqual(out["axes"]["RT"], (0.5 - 0.03) / 0.97, places=3)
+
+        b_writer.close()  # the box drops off; the phone's key stays held
+        for _ in range(50):
+            await asyncio.sleep(0.02)
+            if self.controller.outputs()["keys"] == ["B"]:
+                break
+        self.assertEqual(self.controller.outputs()["keys"], ["B"])
+        p_writer.close()
+
+    async def test_disabled_or_unknown_device_is_refused(self):
+        self.controller.profile.devices["buttonbox"].enabled = False
+        for device in ("buttonbox", "nope"):
+            _, writer, head, _ = await self.open_ws(self.pin, device=device)
+            self.assertIn(b"404", head.split(b"\r\n")[0])
+            writer.close()
 
     async def test_wrong_pin_gets_no_session(self):
         wrong = "000000" if self.pin != "000000" else "111111"

@@ -1,6 +1,6 @@
 [project]
 name = "stusteer"
-version = "0.1.0"
+version = "0.2.0"
 description = "An Android phone as steering wheel, gamepad and LSPDFR button box for GTA V Legacy."
 readme = "README.md"
 requires-python = ">=3.11"

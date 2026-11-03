@@ -36,3 +36,13 @@ class DryRunKeyboard:
 
     def close(self) -> None:
         pass
+
+
+class NullGamepad:
+    """outputs.gamepad.type = "none": no virtual pad at all (keyboard-only profiles)."""
+
+    def set_state(self, buttons: frozenset[str], axes: Mapping[str, float]) -> None:
+        pass
+
+    def close(self) -> None:
+        pass

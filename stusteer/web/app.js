@@ -107,7 +107,10 @@
       updateLive();
     } else if (msg.t === 'tuned') {
       const c = state.controls.get(msg.id);
-      if (c) c.def.curve = msg.curve;
+      if (c) {
+        if (msg.curve) c.def.curve = msg.curve;
+        Object.assign(c.def, msg.options || {}); // pedal mode and travel live on the definition
+      }
       renderTuneFields();
     } else if (msg.t === 'saved') {
       toast('Saved on the PC.');
@@ -244,21 +247,39 @@
     return { def, el };
   }
 
+  // Pedal modes (def.mode, switchable live from the tuning panel):
+  //  absolute  the higher the thumb on the pedal, the more it is pressed (the value jumps to where
+  //            the thumb lands);
+  //  relative  wherever the thumb lands is 0; sliding it up by `travel` (share of the pedal
+  //            height) gives full, so it always starts from 0, like a real pedal's travel;
+  //  digital   any touch is full (on/off).
   function makePedal(def) {
     const el = box(def);
     const fill = document.createElement('div');
     fill.className = 'fill';
-    el.prepend(fill);
-    const digital = def.mode === 'digital';
-    // Analog: the higher the finger on the pedal, the more it is pressed.
+    const anchor = document.createElement('div');
+    anchor.className = 'anchor';
+    anchor.hidden = true;
+    el.prepend(fill, anchor);
+    let y0 = 0, span = 1;
     const valueAt = (e) => {
-      if (digital) return 1;
+      if (def.mode === 'digital') return 1;
       const r = el.getBoundingClientRect();
+      if (def.mode === 'relative') return clamp((y0 - e.clientY) / span, 0, 1);
       return clamp((r.bottom - e.clientY) / r.height, 0, 1);
     };
     const show = (v) => { fill.style.height = (v * 100) + '%'; };
     track(el, {
-      down: (e) => {
+      down: (e, n) => {
+        if (n > 1) return;
+        if (def.mode === 'relative') {
+          const r = el.getBoundingClientRect();
+          y0 = e.clientY;
+          // Full travel as a share of the pedal height; shorter when the thumb lands near the top.
+          span = Math.max(24, Math.min(r.height * (def.travel || 0.45), y0 - r.top - 4));
+          anchor.style.top = (y0 - r.top) + 'px';
+          anchor.hidden = false;
+        }
         const v = valueAt(e);
         state.values.set(def.id, round(v, 3));
         show(v);
@@ -276,6 +297,7 @@
         if (n > 0) return;
         state.values.delete(def.id);
         show(0);
+        anchor.hidden = true;
         el.classList.remove('on');
         sendSnapshot();
       },
@@ -524,7 +546,82 @@
     pedal: [['range', 'Full at', 0.3, 1, 0.01], ['deadzone', 'Deadzone', 0, 0.3, 0.01]],
     stick: [['range', 'Full at', 0.3, 1, 0.01], ['deadzone', 'Deadzone', 0, 0.5, 0.01]],
   };
-  const COMMON_FIELDS = [['anti_deadzone', 'Anti-deadzone', 0, 0.5, 0.01], ['gamma', 'Curve (gamma)', 0.5, 3, 0.05]];
+  const COMMON_FIELDS = [
+    ['anti_deadzone', 'Anti-deadzone', 0, 0.5, 0.01],
+    ['gamma', 'Gamma', 0.5, 3, 0.05],
+    ['max_output', 'Max output', 0.3, 1, 0.05],
+  ];
+  // Response presets: shape + gamma. "Custom" shows when the sliders no longer match one.
+  const PRESETS = {
+    linear: ['Linear', { shape: 'linear', gamma: 1 }],
+    gentle: ['Gentle start', { shape: 'linear', gamma: 2 }],
+    scurve: ['S-curve', { shape: 'scurve', gamma: 1 }],
+    quick: ['Quick start', { shape: 'linear', gamma: 0.5 }],
+  };
+  const PEDAL_MODES = [['absolute', 'Thumb height'], ['relative', 'Slide from touch'], ['digital', 'On / off']];
+
+  // The same curve maths as stusteer/mapping.py, only to draw the preview.
+  function shapeMagnitude(m, c) {
+    if (m <= c.deadzone) return 0;
+    let t = Math.min(1, (m - c.deadzone) / (c.range - c.deadzone));
+    if (c.shape === 'scurve') t = t * t * (3 - 2 * t);
+    t = t ** c.gamma;
+    return (c.anti_deadzone + (1 - c.anti_deadzone) * t) * (c.max_output ?? 1);
+  }
+
+  function drawCurvePreview(canvas, c) {
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth || 240, h = canvas.clientHeight || 120;
+    canvas.width = w * dpr; canvas.height = h * dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    const css = getComputedStyle(document.documentElement);
+    ctx.strokeStyle = css.getPropertyValue('--line'); ctx.lineWidth = 1;
+    ctx.strokeRect(0.5, 0.5, w - 1, h - 1);
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(0, h); ctx.lineTo(w, 0); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = css.getPropertyValue('--blue'); ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    for (let i = 0; i <= 100; i++) {
+      const x = i / 100, y = shapeMagnitude(x * c.range, c);
+      if (i === 0) ctx.moveTo(x * w, h - y * h); else ctx.lineTo(x * w, h - y * h);
+    }
+    ctx.stroke();
+  }
+
+  function row(...nodes) {
+    const r = document.createElement('label');
+    r.className = 'row';
+    r.append(...nodes);
+    return r;
+  }
+
+  function select(options, value, onChange) {
+    const el = document.createElement('select');
+    for (const [v, text] of options) {
+      const o = document.createElement('option');
+      o.value = v; o.textContent = text;
+      el.appendChild(o);
+    }
+    el.value = value;
+    el.addEventListener('change', () => onChange(el.value));
+    return el;
+  }
+
+  function slider(min, max, step, value, onInput) {
+    const input = document.createElement('input');
+    Object.assign(input, { type: 'range', min, max, step, value });
+    const shown = document.createElement('b');
+    shown.textContent = value;
+    let timer = null;
+    input.addEventListener('input', () => {
+      shown.textContent = input.value;
+      clearTimeout(timer);
+      timer = setTimeout(() => onInput(Number(input.value)), 80);
+    });
+    return [input, shown];
+  }
 
   function analogControls() {
     return [...state.controls.values()].filter((c) => c.def.curve);
@@ -544,39 +641,66 @@
     renderTuneFields();
   }
 
-  let tuneTimer = null;
   function renderTuneFields() {
     const box = $('#tune-fields');
     box.innerHTML = '';
     const c = state.controls.get($('#tune-id').value);
     if (!c) { box.textContent = 'No analog controls on this layout.'; return; }
-    const curve = c.def.curve;
-    for (const [field, text, min, max, step] of [...TUNE_FIELDS[c.def.type], ...COMMON_FIELDS]) {
-      const row = document.createElement('label');
-      row.className = 'row';
-      const input = document.createElement('input');
-      Object.assign(input, { type: 'range', min, max, step, value: curve[field] });
-      const shown = document.createElement('b');
-      shown.textContent = curve[field];
-      input.addEventListener('input', () => {
-        shown.textContent = input.value;
-        clearTimeout(tuneTimer);
-        tuneTimer = setTimeout(() => send({ t: 'tune', id: c.def.id, curve: { [field]: Number(input.value) } }), 80);
-      });
-      row.append(text + ' ', input, shown);
-      box.appendChild(row);
+    const def = c.def, curve = def.curve, id = def.id;
+    const tune = (changes) => send({ t: 'tune', id, ...changes });
+
+    if (def.type === 'pedal') {
+      box.appendChild(row('Pedal mode ', select(PEDAL_MODES, def.mode || 'absolute', (v) => tune({ options: { mode: v } }))));
+      if (def.mode === 'relative') {
+        box.appendChild(row('Travel for full ', ...slider(0.15, 1, 0.05, def.travel ?? 0.45, (v) => tune({ options: { travel: v } }))));
+      }
     }
-    if (c.def.type !== 'pedal') {
-      const row = document.createElement('label');
-      row.className = 'row';
+    const preset = Object.entries(PRESETS).find(([, [, p]]) => p.shape === curve.shape && p.gamma === curve.gamma);
+    const presetOptions = Object.entries(PRESETS).map(([k, [text]]) => [k, text]);
+    if (!preset) presetOptions.push(['custom', 'Custom']);
+    box.appendChild(row('Response ', select(presetOptions, preset ? preset[0] : 'custom', (v) => {
+      if (PRESETS[v]) tune({ curve: PRESETS[v][1] });
+    })));
+    const canvas = document.createElement('canvas');
+    canvas.className = 'curve-preview';
+    box.appendChild(canvas);
+    requestAnimationFrame(() => drawCurvePreview(canvas, curve));
+    for (const [field, text, min, max, step] of [...TUNE_FIELDS[def.type], ...COMMON_FIELDS]) {
+      box.appendChild(row(text + ' ', ...slider(min, max, step, curve[field] ?? 1, (v) => tune({ curve: { [field]: v } }))));
+    }
+    if (def.type !== 'pedal') {
       const input = document.createElement('input');
       input.type = 'checkbox';
       input.checked = !!curve.invert;
-      input.addEventListener('change', () => send({ t: 'tune', id: c.def.id, curve: { invert: input.checked } }));
-      row.append(input, ' Invert');
-      box.appendChild(row);
+      input.addEventListener('change', () => tune({ curve: { invert: input.checked } }));
+      box.appendChild(row(input, ' Invert'));
     }
   }
+
+  // Touch probe: shows what this screen reports for a finger, to see whether "press harder"
+  // (pressure or contact size) could work on this phone.
+  (() => {
+    const area = $('#probe-area');
+    const seen = { p: [Infinity, -Infinity], w: [Infinity, -Infinity] };
+    const report = (e) => {
+      if (e.type === 'pointerdown') {
+        e.preventDefault();
+        area.setPointerCapture(e.pointerId);
+      }
+      const size = Math.max(e.width || 0, e.height || 0);
+      seen.p = [Math.min(seen.p[0], e.pressure), Math.max(seen.p[1], e.pressure)];
+      seen.w = [Math.min(seen.w[0], size), Math.max(seen.w[1], size)];
+      const fmt = (r, d) => `${r[0].toFixed(d)}–${r[1].toFixed(d)}`;
+      const pressureVaries = seen.p[1] - seen.p[0] > 0.05;
+      const sizeVaries = seen.w[1] - seen.w[0] > 4;
+      $('#probe-out').textContent =
+        `${e.pointerType}: pressure ${e.pressure.toFixed(3)} (seen ${fmt(seen.p, 3)}), ` +
+        `contact ${size.toFixed(1)} px (seen ${fmt(seen.w, 1)}). ` +
+        (pressureVaries ? 'Pressure changes: a pressure pedal could work. ' : 'Pressure does not change. ') +
+        (sizeVaries ? 'Contact size changes: a "squash your thumb" pedal could work.' : 'Contact size does not change (yet).');
+    };
+    for (const type of ['pointerdown', 'pointermove']) area.addEventListener(type, report);
+  })();
 
   function openSettings() {
     $('#opt-fusion').checked = state.opts.fusion;

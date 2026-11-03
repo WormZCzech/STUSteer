@@ -19,6 +19,29 @@
 STUSteer never reads or writes game files. It talks to the game the way a USB pad and a keyboard
 do.
 
+## The framework (profile schema 2)
+
+- **Devices** (`devices.py`, `profile.py`) produce snapshots of their controls. Types: `phone`
+  (layouts on screens) and `network` (a flat list of controls, any WebSocket client, e.g. an
+  ESP32). Planned: `serial`, `hid`, `midi`, `streamdeck`, each a small driver class.
+- **The controller** keeps one snapshot per device, merges them (held if any device holds it;
+  furthest-from-zero axis wins) and runs a watchdog per device.
+- **Outputs** (`outputs` in the profile): the virtual Xbox 360 pad (or none), and keyboard + mouse
+  buttons with the focus guard. A DualShock 4 pad (vgamepad has it) or vJoy would be further
+  output types.
+- **Keys** (`keys.py`) cover every key Windows knows. Each key has its VK and scan code; for
+  layout-dependent keys the scan code is looked up in the active layout at send time
+  (MapVirtualKeyEx), so "Y" means the key that types Y.
+
+## Your decisions (2026-11-03)
+
+| # | Decision |
+| --- | --- |
+| U-001 | Pedals keep **thumb height** (`absolute`) as the default; **slide from touch** (`relative`) is an option per pedal |
+| U-002 | Response curves are **selectable**; **S-curve** is the default for pedals (wheel and sticks stay linear) |
+| U-003 | **Every button can send any key**, including keys no keyboard has (F13–F24), plus media keys, mouse buttons and raw codes |
+| U-004 | The PC side is a **config framework** for several devices: the phone now, a network button box now, more custom and external boxes later (`docs/devices.md`) |
+
 ## Decisions (proposed 2026-11-03, yours to confirm)
 
 | # | Decision | Alternatives | Why |
@@ -72,18 +95,23 @@ immediately.
 
 ## Testing
 
-- `python -m unittest` (35 tests): keys, curves, profile validation, the controller's timing rules,
-  the focus guard, WebSocket framing, the receiver over real sockets with HTTP and HTTPS.
-- `node tests/e2e/phone_e2e.js [shots]` (16 checks): a headless Chromium posing as a 915×412
-  Android phone drives a dry-run receiver. It checks tilt, pedals, multitouch, keys, the sticks, the
-  touch wheel, live tuning and the watchdog, and saves screenshots.
+- `python -m unittest` (43 tests) covers:
+  - keys (including F13–F24 and raw codes), curves (S-curve, cap) and profile validation;
+  - the controller's timing rules and merging of several devices with separate watchdogs;
+  - the focus guard and WebSocket framing;
+  - the receiver over real sockets with HTTP and HTTPS: phone and button box together, live
+    tuning of curves and pedal modes.
+- `node tests/e2e/phone_e2e.js [shots]` (18 checks): a headless Chromium posing as a 915×412
+  Android phone drives a dry-run receiver. It checks tilt, both pedal modes with the S-curve,
+  multitouch, keys, the sticks, the touch wheel, live tuning and the watchdog, and saves screenshots.
 - Not testable here: ViGEmBus, SendInput, GTA itself, and the motion sensors of a real phone. Those
   are the first manual checks (README, "First run").
 
 ## Next steps (not built yet)
 
-1. Your first real run (README checklist) and fixes from it.
-2. Layout editor on the phone (drag, resize, bind), saving to the profile on the PC.
-3. Tilt pedals (pitch → gas/brake) and paddle/gear controls for other games.
-4. Optional native Android app with UDP for the last few ms, using the same profile and snapshots.
-5. A QR code in the receiver window for pairing.
+1. Your first real run (README checklist) and fixes from it; the touch probe on your S24.
+2. Layout editor on the phone (drag, resize, bind to any key), saving to the profile on the PC.
+3. The first local device driver (USB serial for an Arduino/ESP32 box, needs pyserial).
+4. Tilt pedals (pitch → gas/brake) and paddle/gear controls for other games.
+5. Optional native Android app with UDP for the last few ms, using the same profile and snapshots.
+6. A QR code in the receiver window for pairing.

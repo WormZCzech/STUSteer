@@ -1,20 +1,25 @@
-"""Keyboard output on Windows: SendInput with scan codes, guarded by the foreground window.
+"""Keyboard and mouse-button output on Windows: SendInput, guarded by the foreground window.
 
 SendInput (user32.dll) puts synthetic input into the same queue real hardware input goes into. We
-fill an INPUT structure of type INPUT_KEYBOARD with the key's scan code and the flags
-KEYEVENTF_SCANCODE (+ KEYEVENTF_EXTENDEDKEY for 0xE0 keys, + KEYEVENTF_KEYUP to release). ctypes
-describes the C structures so Python can pass them to the DLL; the union is declared in full because
-SendInput checks sizeof(INPUT) (40 bytes on 64-bit Windows).
+fill INPUT structures (ctypes describes the C layout; the union is declared in full because
+SendInput checks sizeof(INPUT), 40 bytes on 64-bit Windows):
 
-Focus guard: injected keys go to whatever window has focus. If you alt-tab to a browser and your
-phone is still in your hand, "B" would be typed there. So a key press is only sent while the
-foreground window belongs to one of settings.key_target_processes (GTA5.exe by default); releases
-are always sent so nothing can stay stuck. An empty list turns the guard off.
+- keys with a scan code: KEYEVENTF_SCANCODE (+ KEYEVENTF_EXTENDEDKEY for 0xE0 keys, + KEYEVENTF_KEYUP
+  to release). Windows derives the virtual key from the scan code, so raw-input games and VK-based
+  plugins both see a normal key press. For letters, digits and punctuation the scan code comes from
+  the foreground window's keyboard layout (MapVirtualKeyEx), so "Y" types Y on QWERTZ too. The code
+  used for the press is remembered and reused for the release.
+- keys without a usable scan code (media keys, PAUSE, "VK:0x.."): the virtual-key code only.
+- mouse buttons: an INPUT_MOUSE event with MOUSEEVENTF_LEFTDOWN / ...UP (X buttons carry 1 or 2 in
+  mouseData).
 
-Two Windows limits worth knowing:
+Focus guard: injected input goes to whatever window has focus. A press is only sent while the
+foreground window belongs to one of the target processes (GTA5.exe by default); releases always go
+out, so nothing can stay stuck. An empty list turns the guard off.
+
+Windows limits worth knowing:
 - UIPI: a normal process cannot inject into an elevated (run-as-admin) window, and SendInput does
   not report it. If GTA V / RAGE Plugin Hook runs as admin, run STUSteer as admin too.
-- Some anti-cheat blocks injected input. Not an issue for single-player GTA V with LSPDFR.
 """
 
 from __future__ import annotations
@@ -25,16 +30,21 @@ import os
 from collections.abc import Callable, Sequence
 from ctypes import wintypes
 
-from ..keys import SCANCODES
+from ..keys import key_def
 
 log = logging.getLogger("stusteer.keyboard")
 
+INPUT_MOUSE = 0
 INPUT_KEYBOARD = 1
 KEYEVENTF_EXTENDEDKEY = 0x0001
 KEYEVENTF_KEYUP = 0x0002
 KEYEVENTF_SCANCODE = 0x0008
+MAPVK_VK_TO_VSC_EX = 4
 PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 ULONG_PTR = ctypes.c_size_t
+# (down flag, up flag, mouseData) per mouse button number
+MOUSE_FLAGS = {1: (0x0002, 0x0004, 0), 2: (0x0008, 0x0010, 0), 3: (0x0020, 0x0040, 0),
+               4: (0x0080, 0x0100, 1), 5: (0x0080, 0x0100, 2)}
 
 
 class KEYBDINPUT(ctypes.Structure):
@@ -70,16 +80,24 @@ class INPUT(ctypes.Structure):
     _fields_ = [("type", wintypes.DWORD), ("u", _INPUTUNION)]
 
 
-def foreground_process_name() -> str | None:
-    """File name of the process that owns the foreground window ('GTA5.exe'), or None."""
+def _foreground() -> tuple[int, int]:
+    """(window handle, thread id) of the foreground window; (0, 0) if none."""
     user32 = ctypes.WinDLL("user32", use_last_error=True)
-    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
     hwnd = user32.GetForegroundWindow()
     if not hwnd:
-        return None
+        return 0, 0
     pid = wintypes.DWORD()
-    user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
-    handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid.value)
+    thread = user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+    return pid.value, thread
+
+
+def foreground_process_name() -> str | None:
+    """File name of the process that owns the foreground window ('GTA5.exe'), or None."""
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    pid, _ = _foreground()
+    if not pid:
+        return None
+    handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
     if not handle:
         return None
     try:
@@ -93,7 +111,7 @@ def foreground_process_name() -> str | None:
 
 
 class FocusGuard:
-    """Decides whether a key press may be sent now. Pure logic; the lookup is injected for tests."""
+    """Decides whether a press may be sent now. Pure logic; the lookup is injected for tests."""
 
     def __init__(self, targets: Sequence[str], lookup: Callable[[], str | None]) -> None:
         self._targets = {t.casefold() for t in targets}
@@ -118,22 +136,57 @@ class WindowsKeyboard:
         self._user32 = ctypes.WinDLL("user32", use_last_error=True)
         self._user32.SendInput.argtypes = (wintypes.UINT, ctypes.POINTER(INPUT), ctypes.c_int)
         self._user32.SendInput.restype = wintypes.UINT
+        self._user32.MapVirtualKeyExW.argtypes = (wintypes.UINT, wintypes.UINT, ctypes.c_void_p)
+        self._user32.MapVirtualKeyExW.restype = wintypes.UINT
+        self._user32.GetKeyboardLayout.argtypes = (wintypes.DWORD,)
+        self._user32.GetKeyboardLayout.restype = ctypes.c_void_p
         self._guard = FocusGuard(target_processes, foreground_process_name)
+        self._down: dict[str, INPUT] = {}  # name -> the event used for the press, reused for the release
+
+    def _layout_scan(self, vk: int) -> tuple[int, bool] | None:
+        _, thread = _foreground()
+        hkl = self._user32.GetKeyboardLayout(thread)
+        code = self._user32.MapVirtualKeyExW(vk, MAPVK_VK_TO_VSC_EX, hkl)
+        if not code:
+            return None
+        return code & 0xFF, (code >> 8) == 0xE0
+
+    def _press_event(self, name: str) -> INPUT:
+        spec = key_def(name)
+        if spec.kind == "mouse":
+            down, _, data = MOUSE_FLAGS[spec.mouse]
+            return INPUT(type=INPUT_MOUSE, u=_INPUTUNION(mi=MOUSEINPUT(0, 0, data, down, 0, 0)))
+        if spec.kind == "vk":
+            return INPUT(type=INPUT_KEYBOARD, u=_INPUTUNION(ki=KEYBDINPUT(spec.vk, 0, 0, 0, 0)))
+        scan, extended = spec.scan, spec.extended
+        if spec.layout:
+            scan, extended = self._layout_scan(spec.vk) or (scan, extended)
+        flags = KEYEVENTF_SCANCODE | (KEYEVENTF_EXTENDEDKEY if extended else 0)
+        return INPUT(type=INPUT_KEYBOARD, u=_INPUTUNION(ki=KEYBDINPUT(0, scan, flags, 0, 0)))
+
+    @staticmethod
+    def _release_event(press: INPUT, name: str) -> INPUT:
+        if press.type == INPUT_MOUSE:
+            _, up, data = MOUSE_FLAGS[key_def(name).mouse]
+            return INPUT(type=INPUT_MOUSE, u=_INPUTUNION(mi=MOUSEINPUT(0, 0, data, up, 0, 0)))
+        ki = press.u.ki
+        return INPUT(type=INPUT_KEYBOARD,
+                     u=_INPUTUNION(ki=KEYBDINPUT(ki.wVk, ki.wScan, ki.dwFlags | KEYEVENTF_KEYUP, 0, 0)))
 
     def key(self, name: str, down: bool) -> bool:
-        if down and not self._guard.allows_press():
-            return False
-        scan = SCANCODES[name]
-        flags = KEYEVENTF_SCANCODE
-        if scan.extended:
-            flags |= KEYEVENTF_EXTENDEDKEY
-        if not down:
-            flags |= KEYEVENTF_KEYUP
-        event = INPUT(type=INPUT_KEYBOARD, u=_INPUTUNION(ki=KEYBDINPUT(0, scan.code, flags, 0, 0)))
+        if down:
+            if not self._guard.allows_press():
+                return False
+            event = self._press_event(name)
+        else:
+            press = self._down.pop(name, None) or self._press_event(name)
+            event = self._release_event(press, name)
         sent = self._user32.SendInput(1, ctypes.byref(event), ctypes.sizeof(INPUT))
         if sent != 1:
             log.error("SendInput failed for %s (error %d)", name, ctypes.get_last_error())
             return False
+        if down:
+            self._down[name] = event
         return True
 
     def close(self) -> None:

@@ -1,954 +1,1049 @@
 {
+  "schema": 2,
   "name": "GTA V Legacy + LSPDFR",
-  "about": "Default bindings: GTA V's own Xbox controller layout plus LSPDFR's default keyboard keys. Check the LSPDFR keys against your lspdfr/keys.ini (docs/gta-bindings.md).",
+  "about": "Default bindings: GTA V's own Xbox controller layout plus LSPDFR's default keyboard keys. Check the LSPDFR keys against your lspdfr/keys.ini (docs/gta-bindings.md). Format: stusteer/profile.py and docs/devices.md.",
   "settings": {
     "min_hold_ms": 60,
-    "watchdog_ms": 500,
-    "key_target_processes": [
-      "GTA5.exe"
-    ]
+    "watchdog_ms": 500
   },
-  "layouts": [
+  "outputs": {
+    "gamepad": {
+      "type": "xbox360"
+    },
+    "keyboard": {
+      "target_processes": [
+        "GTA5.exe"
+      ]
+    }
+  },
+  "devices": [
     {
-      "id": "drive",
-      "name": "Drive (tilt)",
-      "controls": [
+      "id": "phone",
+      "type": "phone",
+      "name": "Android phone",
+      "layouts": [
         {
-          "id": "brake",
-          "type": "pedal",
-          "label": "Brake",
-          "hint": "LT",
-          "x": 1,
-          "y": 26,
-          "w": 12,
-          "h": 72,
-          "bind": {
-            "axis": "LT"
-          },
-          "accent": "red"
+          "id": "drive",
+          "name": "Drive (tilt)",
+          "controls": [
+            {
+              "id": "brake",
+              "type": "pedal",
+              "label": "Brake",
+              "hint": "LT",
+              "x": 1,
+              "y": 26,
+              "w": 12,
+              "h": 72,
+              "bind": {
+                "axis": "LT"
+              },
+              "accent": "red",
+              "mode": "absolute",
+              "travel": 0.45,
+              "curve": {
+                "shape": "scurve",
+                "range": 1,
+                "deadzone": 0.02
+              }
+            },
+            {
+              "id": "gas",
+              "type": "pedal",
+              "label": "Gas",
+              "hint": "RT",
+              "x": 87,
+              "y": 26,
+              "w": 12,
+              "h": 72,
+              "bind": {
+                "axis": "RT"
+              },
+              "accent": "green",
+              "mode": "absolute",
+              "travel": 0.45,
+              "curve": {
+                "shape": "scurve",
+                "range": 1,
+                "deadzone": 0.02
+              }
+            },
+            {
+              "id": "lookback",
+              "type": "button",
+              "label": "Look back",
+              "x": 14.5,
+              "y": 2,
+              "w": 13.5,
+              "h": 30,
+              "bind": {
+                "pad": "RS"
+              },
+              "hint": "RS"
+            },
+            {
+              "id": "horn",
+              "type": "button",
+              "label": "Horn / Siren",
+              "x": 14.5,
+              "y": 35,
+              "w": 13.5,
+              "h": 30,
+              "bind": {
+                "pad": "LS"
+              },
+              "hint": "LS (tap: siren)",
+              "accent": "blue"
+            },
+            {
+              "id": "handbrake",
+              "type": "button",
+              "label": "Handbrake",
+              "x": 14.5,
+              "y": 68,
+              "w": 13.5,
+              "h": 30,
+              "bind": {
+                "pad": "RB"
+              },
+              "hint": "RB",
+              "accent": "amber"
+            },
+            {
+              "id": "cam",
+              "type": "button",
+              "label": "Camera",
+              "x": 1,
+              "y": 2,
+              "w": 12,
+              "h": 22,
+              "bind": {
+                "pad": "BACK"
+              },
+              "hint": "Back"
+            },
+            {
+              "id": "exit",
+              "type": "button",
+              "label": "Enter / Exit",
+              "x": 72,
+              "y": 2,
+              "w": 13.5,
+              "h": 22,
+              "bind": {
+                "pad": "Y"
+              },
+              "hint": "Y"
+            },
+            {
+              "id": "lights",
+              "type": "button",
+              "label": "Lights",
+              "x": 72,
+              "y": 26.5,
+              "w": 13.5,
+              "h": 22,
+              "bind": {
+                "pad": "DPAD_RIGHT"
+              },
+              "hint": "D-pad right"
+            },
+            {
+              "id": "radio",
+              "type": "button",
+              "label": "Radio",
+              "x": 72,
+              "y": 51,
+              "w": 13.5,
+              "h": 22,
+              "bind": {
+                "pad": "DPAD_LEFT"
+              },
+              "hint": "D-pad left"
+            },
+            {
+              "id": "phone",
+              "type": "button",
+              "label": "Phone",
+              "x": 72,
+              "y": 75.5,
+              "w": 13.5,
+              "h": 22.5,
+              "bind": {
+                "pad": "DPAD_UP"
+              },
+              "hint": "D-pad up"
+            },
+            {
+              "id": "pause",
+              "type": "button",
+              "label": "Pause",
+              "x": 87,
+              "y": 2,
+              "w": 12,
+              "h": 22,
+              "bind": {
+                "pad": "START"
+              },
+              "hint": "Start"
+            },
+            {
+              "id": "wheel",
+              "type": "wheel",
+              "label": "Tilt to steer",
+              "mode": "tilt",
+              "x": 30,
+              "y": 1,
+              "w": 40,
+              "h": 77,
+              "bind": {
+                "axis": "LX"
+              },
+              "curve": {
+                "range": 60,
+                "deadzone": 0.8,
+                "anti_deadzone": 0.0,
+                "gamma": 1.0
+              }
+            },
+            {
+              "id": "l_accept",
+              "type": "button",
+              "label": "Accept call",
+              "x": 30,
+              "y": 80,
+              "w": 9.25,
+              "h": 18,
+              "bind": {
+                "key": "Y"
+              },
+              "hint": "Y",
+              "accent": "green"
+            },
+            {
+              "id": "l_end",
+              "type": "button",
+              "label": "End call",
+              "x": 40.25,
+              "y": 80,
+              "w": 9.25,
+              "h": 18,
+              "bind": {
+                "key": "END"
+              },
+              "hint": "End",
+              "accent": "red"
+            },
+            {
+              "id": "l_stop",
+              "type": "button",
+              "label": "Traffic stop",
+              "x": 50.5,
+              "y": 80,
+              "w": 9.25,
+              "h": 18,
+              "bind": {
+                "key": "LSHIFT"
+              },
+              "hint": "L-Shift",
+              "accent": "blue"
+            },
+            {
+              "id": "l_backup",
+              "type": "button",
+              "label": "Backup",
+              "x": 60.75,
+              "y": 80,
+              "w": 9.25,
+              "h": 18,
+              "bind": {
+                "key": "B"
+              },
+              "hint": "B",
+              "accent": "blue"
+            }
+          ]
         },
         {
-          "id": "gas",
-          "type": "pedal",
-          "label": "Gas",
-          "hint": "RT",
-          "x": 87,
-          "y": 26,
-          "w": 12,
-          "h": 72,
-          "bind": {
-            "axis": "RT"
-          },
-          "accent": "green"
+          "id": "drive_touch",
+          "name": "Drive (touch)",
+          "controls": [
+            {
+              "id": "t_brake",
+              "type": "pedal",
+              "label": "Brake",
+              "hint": "LT",
+              "x": 1,
+              "y": 26,
+              "w": 12,
+              "h": 72,
+              "bind": {
+                "axis": "LT"
+              },
+              "accent": "red",
+              "mode": "absolute",
+              "travel": 0.45,
+              "curve": {
+                "shape": "scurve",
+                "range": 1,
+                "deadzone": 0.02
+              }
+            },
+            {
+              "id": "t_gas",
+              "type": "pedal",
+              "label": "Gas",
+              "hint": "RT",
+              "x": 87,
+              "y": 26,
+              "w": 12,
+              "h": 72,
+              "bind": {
+                "axis": "RT"
+              },
+              "accent": "green",
+              "mode": "absolute",
+              "travel": 0.45,
+              "curve": {
+                "shape": "scurve",
+                "range": 1,
+                "deadzone": 0.02
+              }
+            },
+            {
+              "id": "t_lookback",
+              "type": "button",
+              "label": "Look back",
+              "x": 14.5,
+              "y": 2,
+              "w": 13.5,
+              "h": 30,
+              "bind": {
+                "pad": "RS"
+              },
+              "hint": "RS"
+            },
+            {
+              "id": "t_horn",
+              "type": "button",
+              "label": "Horn / Siren",
+              "x": 14.5,
+              "y": 35,
+              "w": 13.5,
+              "h": 30,
+              "bind": {
+                "pad": "LS"
+              },
+              "hint": "LS (tap: siren)",
+              "accent": "blue"
+            },
+            {
+              "id": "t_handbrake",
+              "type": "button",
+              "label": "Handbrake",
+              "x": 14.5,
+              "y": 68,
+              "w": 13.5,
+              "h": 30,
+              "bind": {
+                "pad": "RB"
+              },
+              "hint": "RB",
+              "accent": "amber"
+            },
+            {
+              "id": "t_cam",
+              "type": "button",
+              "label": "Camera",
+              "x": 1,
+              "y": 2,
+              "w": 12,
+              "h": 22,
+              "bind": {
+                "pad": "BACK"
+              },
+              "hint": "Back"
+            },
+            {
+              "id": "t_exit",
+              "type": "button",
+              "label": "Enter / Exit",
+              "x": 72,
+              "y": 2,
+              "w": 13.5,
+              "h": 22,
+              "bind": {
+                "pad": "Y"
+              },
+              "hint": "Y"
+            },
+            {
+              "id": "t_lights",
+              "type": "button",
+              "label": "Lights",
+              "x": 72,
+              "y": 26.5,
+              "w": 13.5,
+              "h": 22,
+              "bind": {
+                "pad": "DPAD_RIGHT"
+              },
+              "hint": "D-pad right"
+            },
+            {
+              "id": "t_radio",
+              "type": "button",
+              "label": "Radio",
+              "x": 72,
+              "y": 51,
+              "w": 13.5,
+              "h": 22,
+              "bind": {
+                "pad": "DPAD_LEFT"
+              },
+              "hint": "D-pad left"
+            },
+            {
+              "id": "t_phone",
+              "type": "button",
+              "label": "Phone",
+              "x": 72,
+              "y": 75.5,
+              "w": 13.5,
+              "h": 22.5,
+              "bind": {
+                "pad": "DPAD_UP"
+              },
+              "hint": "D-pad up"
+            },
+            {
+              "id": "t_pause",
+              "type": "button",
+              "label": "Pause",
+              "x": 87,
+              "y": 2,
+              "w": 12,
+              "h": 22,
+              "bind": {
+                "pad": "START"
+              },
+              "hint": "Start"
+            },
+            {
+              "id": "t_wheel",
+              "type": "wheel",
+              "label": "Drag to steer",
+              "mode": "touch",
+              "lock": 360,
+              "autocenter": true,
+              "x": 30,
+              "y": 1,
+              "w": 40,
+              "h": 77,
+              "bind": {
+                "axis": "LX"
+              },
+              "curve": {
+                "range": 180,
+                "deadzone": 2,
+                "anti_deadzone": 0.0,
+                "gamma": 1.0
+              }
+            },
+            {
+              "id": "t_l_accept",
+              "type": "button",
+              "label": "Accept call",
+              "x": 30,
+              "y": 80,
+              "w": 9.25,
+              "h": 18,
+              "bind": {
+                "key": "Y"
+              },
+              "hint": "Y",
+              "accent": "green"
+            },
+            {
+              "id": "t_l_end",
+              "type": "button",
+              "label": "End call",
+              "x": 40.25,
+              "y": 80,
+              "w": 9.25,
+              "h": 18,
+              "bind": {
+                "key": "END"
+              },
+              "hint": "End",
+              "accent": "red"
+            },
+            {
+              "id": "t_l_stop",
+              "type": "button",
+              "label": "Traffic stop",
+              "x": 50.5,
+              "y": 80,
+              "w": 9.25,
+              "h": 18,
+              "bind": {
+                "key": "LSHIFT"
+              },
+              "hint": "L-Shift",
+              "accent": "blue"
+            },
+            {
+              "id": "t_l_backup",
+              "type": "button",
+              "label": "Backup",
+              "x": 60.75,
+              "y": 80,
+              "w": 9.25,
+              "h": 18,
+              "bind": {
+                "key": "B"
+              },
+              "hint": "B",
+              "accent": "blue"
+            }
+          ]
         },
         {
-          "id": "lookback",
-          "type": "button",
-          "label": "Look back",
-          "x": 14.5,
-          "y": 2,
-          "w": 13.5,
-          "h": 30,
-          "bind": {
-            "pad": "RS"
-          },
-          "hint": "RS"
+          "id": "foot",
+          "name": "On foot",
+          "controls": [
+            {
+              "id": "ls",
+              "type": "stick",
+              "label": "Move",
+              "x": 2,
+              "y": 28,
+              "w": 27,
+              "h": 70,
+              "bind": {
+                "stick": "L"
+              },
+              "curve": {
+                "range": 1,
+                "deadzone": 0.1
+              }
+            },
+            {
+              "id": "rs",
+              "type": "stick",
+              "label": "Look",
+              "x": 49,
+              "y": 28,
+              "w": 24,
+              "h": 70,
+              "bind": {
+                "stick": "R"
+              },
+              "curve": {
+                "range": 1,
+                "deadzone": 0.1,
+                "gamma": 1.4
+              }
+            },
+            {
+              "id": "aim",
+              "type": "pedal",
+              "label": "Aim",
+              "hint": "LT",
+              "mode": "digital",
+              "x": 1,
+              "y": 2,
+              "w": 14,
+              "h": 23,
+              "bind": {
+                "axis": "LT"
+              }
+            },
+            {
+              "id": "weapons",
+              "type": "button",
+              "label": "Weapons",
+              "x": 16,
+              "y": 2,
+              "w": 12.5,
+              "h": 23,
+              "bind": {
+                "pad": "LB"
+              },
+              "hint": "LB (hold)"
+            },
+            {
+              "id": "back",
+              "type": "button",
+              "label": "Camera",
+              "x": 31,
+              "y": 2,
+              "w": 7.5,
+              "h": 23,
+              "bind": {
+                "pad": "BACK"
+              },
+              "hint": "Back"
+            },
+            {
+              "id": "start",
+              "type": "button",
+              "label": "Pause",
+              "x": 40,
+              "y": 2,
+              "w": 7.5,
+              "h": 23,
+              "bind": {
+                "pad": "START"
+              },
+              "hint": "Start"
+            },
+            {
+              "id": "cover",
+              "type": "button",
+              "label": "Cover",
+              "x": 71,
+              "y": 2,
+              "w": 13,
+              "h": 23,
+              "bind": {
+                "pad": "RB"
+              },
+              "hint": "RB"
+            },
+            {
+              "id": "shoot",
+              "type": "pedal",
+              "label": "Shoot",
+              "hint": "RT",
+              "mode": "digital",
+              "x": 85.5,
+              "y": 2,
+              "w": 13.5,
+              "h": 23,
+              "bind": {
+                "axis": "RT"
+              },
+              "accent": "red"
+            },
+            {
+              "id": "d_up",
+              "type": "button",
+              "label": "▲",
+              "x": 36.5,
+              "y": 30,
+              "w": 6,
+              "h": 21,
+              "bind": {
+                "pad": "DPAD_UP"
+              },
+              "hint": "Phone"
+            },
+            {
+              "id": "d_left",
+              "type": "button",
+              "label": "◀",
+              "x": 31,
+              "y": 53,
+              "w": 5.5,
+              "h": 21,
+              "bind": {
+                "pad": "DPAD_LEFT"
+              }
+            },
+            {
+              "id": "d_right",
+              "type": "button",
+              "label": "▶",
+              "x": 42.5,
+              "y": 53,
+              "w": 5.5,
+              "h": 21,
+              "bind": {
+                "pad": "DPAD_RIGHT"
+              }
+            },
+            {
+              "id": "d_down",
+              "type": "button",
+              "label": "▼",
+              "x": 36.5,
+              "y": 76,
+              "w": 6,
+              "h": 21,
+              "bind": {
+                "pad": "DPAD_DOWN"
+              },
+              "hint": "Character"
+            },
+            {
+              "id": "y",
+              "type": "button",
+              "label": "Y",
+              "x": 81,
+              "y": 28,
+              "w": 10,
+              "h": 22,
+              "bind": {
+                "pad": "Y"
+              },
+              "hint": "Enter car",
+              "accent": "amber"
+            },
+            {
+              "id": "x",
+              "type": "button",
+              "label": "X",
+              "x": 74.5,
+              "y": 52,
+              "w": 10,
+              "h": 22,
+              "bind": {
+                "pad": "X"
+              },
+              "hint": "Jump",
+              "accent": "blue"
+            },
+            {
+              "id": "b",
+              "type": "button",
+              "label": "B",
+              "x": 88,
+              "y": 52,
+              "w": 10.5,
+              "h": 22,
+              "bind": {
+                "pad": "B"
+              },
+              "hint": "Reload / melee",
+              "accent": "red"
+            },
+            {
+              "id": "a",
+              "type": "button",
+              "label": "A",
+              "x": 81,
+              "y": 76,
+              "w": 10,
+              "h": 22,
+              "bind": {
+                "pad": "A"
+              },
+              "hint": "Sprint",
+              "accent": "green"
+            }
+          ]
         },
         {
-          "id": "horn",
-          "type": "button",
-          "label": "Horn / Siren",
-          "x": 14.5,
-          "y": 35,
-          "w": 13.5,
-          "h": 30,
-          "bind": {
-            "pad": "LS"
-          },
-          "hint": "LS (tap: siren)",
-          "accent": "blue"
-        },
-        {
-          "id": "handbrake",
-          "type": "button",
-          "label": "Handbrake",
-          "x": 14.5,
-          "y": 68,
-          "w": 13.5,
-          "h": 30,
-          "bind": {
-            "pad": "RB"
-          },
-          "hint": "RB",
-          "accent": "amber"
-        },
-        {
-          "id": "cam",
-          "type": "button",
-          "label": "Camera",
-          "x": 1,
-          "y": 2,
-          "w": 12,
-          "h": 22,
-          "bind": {
-            "pad": "BACK"
-          },
-          "hint": "Back"
-        },
-        {
-          "id": "exit",
-          "type": "button",
-          "label": "Enter / Exit",
-          "x": 72,
-          "y": 2,
-          "w": 13.5,
-          "h": 22,
-          "bind": {
-            "pad": "Y"
-          },
-          "hint": "Y"
-        },
-        {
-          "id": "lights",
-          "type": "button",
-          "label": "Lights",
-          "x": 72,
-          "y": 26.5,
-          "w": 13.5,
-          "h": 22,
-          "bind": {
-            "pad": "DPAD_RIGHT"
-          },
-          "hint": "D-pad right"
-        },
-        {
-          "id": "radio",
-          "type": "button",
-          "label": "Radio",
-          "x": 72,
-          "y": 51,
-          "w": 13.5,
-          "h": 22,
-          "bind": {
-            "pad": "DPAD_LEFT"
-          },
-          "hint": "D-pad left"
-        },
-        {
-          "id": "phone",
-          "type": "button",
-          "label": "Phone",
-          "x": 72,
-          "y": 75.5,
-          "w": 13.5,
-          "h": 22.5,
-          "bind": {
-            "pad": "DPAD_UP"
-          },
-          "hint": "D-pad up"
-        },
-        {
-          "id": "pause",
-          "type": "button",
-          "label": "Pause",
-          "x": 87,
-          "y": 2,
-          "w": 12,
-          "h": 22,
-          "bind": {
-            "pad": "START"
-          },
-          "hint": "Start"
-        },
-        {
-          "id": "wheel",
-          "type": "wheel",
-          "label": "Tilt to steer",
-          "mode": "tilt",
-          "x": 30,
-          "y": 1,
-          "w": 40,
-          "h": 77,
-          "bind": {
-            "axis": "LX"
-          },
-          "curve": {
-            "range": 60,
-            "deadzone": 0.8,
-            "anti_deadzone": 0.0,
-            "gamma": 1.0
-          }
-        },
-        {
-          "id": "l_accept",
-          "type": "button",
-          "label": "Accept call",
-          "x": 30,
-          "y": 80,
-          "w": 9.25,
-          "h": 18,
-          "bind": {
-            "key": "Y"
-          },
-          "hint": "Y",
-          "accent": "green"
-        },
-        {
-          "id": "l_end",
-          "type": "button",
-          "label": "End call",
-          "x": 40.25,
-          "y": 80,
-          "w": 9.25,
-          "h": 18,
-          "bind": {
-            "key": "END"
-          },
-          "hint": "End",
-          "accent": "red"
-        },
-        {
-          "id": "l_stop",
-          "type": "button",
-          "label": "Traffic stop",
-          "x": 50.5,
-          "y": 80,
-          "w": 9.25,
-          "h": 18,
-          "bind": {
-            "key": "LSHIFT"
-          },
-          "hint": "L-Shift",
-          "accent": "blue"
-        },
-        {
-          "id": "l_backup",
-          "type": "button",
-          "label": "Backup",
-          "x": 60.75,
-          "y": 80,
-          "w": 9.25,
-          "h": 18,
-          "bind": {
-            "key": "B"
-          },
-          "hint": "B",
-          "accent": "blue"
+          "id": "lspdfr",
+          "name": "LSPDFR",
+          "controls": [
+            {
+              "id": "accept",
+              "type": "button",
+              "label": "Accept callout",
+              "x": 1,
+              "y": 2,
+              "w": 15,
+              "h": 30,
+              "bind": {
+                "key": "Y"
+              },
+              "hint": "Y",
+              "accent": "green"
+            },
+            {
+              "id": "endcall",
+              "type": "button",
+              "label": "End callout",
+              "x": 17,
+              "y": 2,
+              "w": 15,
+              "h": 30,
+              "bind": {
+                "key": "END"
+              },
+              "hint": "End",
+              "accent": "red"
+            },
+            {
+              "id": "stop",
+              "type": "button",
+              "label": "Traffic stop",
+              "x": 33,
+              "y": 2,
+              "w": 15,
+              "h": 30,
+              "bind": {
+                "key": "LSHIFT"
+              },
+              "hint": "L-Shift (hold)",
+              "accent": "blue"
+            },
+            {
+              "id": "backup",
+              "type": "button",
+              "label": "Backup menu",
+              "x": 49,
+              "y": 2,
+              "w": 15,
+              "h": 30,
+              "bind": {
+                "key": "B"
+              },
+              "hint": "B",
+              "accent": "blue"
+            },
+            {
+              "id": "interact",
+              "type": "button",
+              "label": "Interact / Talk",
+              "x": 1,
+              "y": 35,
+              "w": 15,
+              "h": 30,
+              "bind": {
+                "key": "E"
+              },
+              "hint": "E",
+              "accent": "amber"
+            },
+            {
+              "id": "p_horn",
+              "type": "button",
+              "label": "Siren",
+              "x": 17,
+              "y": 35,
+              "w": 15,
+              "h": 30,
+              "bind": {
+                "pad": "LS"
+              },
+              "hint": "pad LS (tap)"
+            },
+            {
+              "id": "p_exit",
+              "type": "button",
+              "label": "Enter / Exit",
+              "x": 33,
+              "y": 35,
+              "w": 15,
+              "h": 30,
+              "bind": {
+                "pad": "Y"
+              },
+              "hint": "pad Y"
+            },
+            {
+              "id": "p_lights",
+              "type": "button",
+              "label": "Lights",
+              "x": 49,
+              "y": 35,
+              "w": 15,
+              "h": 30,
+              "bind": {
+                "pad": "DPAD_RIGHT"
+              },
+              "hint": "pad D-pad right"
+            },
+            {
+              "id": "esc",
+              "type": "button",
+              "label": "Pause",
+              "x": 1,
+              "y": 68,
+              "w": 15,
+              "h": 30,
+              "bind": {
+                "key": "ESC"
+              },
+              "hint": "Esc"
+            },
+            {
+              "id": "console",
+              "type": "button",
+              "label": "RPH console",
+              "x": 17,
+              "y": 68,
+              "w": 15,
+              "h": 30,
+              "bind": {
+                "key": "F4"
+              },
+              "hint": "F4"
+            },
+            {
+              "id": "p_phone",
+              "type": "button",
+              "label": "Phone",
+              "x": 33,
+              "y": 68,
+              "w": 15,
+              "h": 30,
+              "bind": {
+                "pad": "DPAD_UP"
+              },
+              "hint": "pad D-pad up"
+            },
+            {
+              "id": "p_cam",
+              "type": "button",
+              "label": "Camera",
+              "x": 49,
+              "y": 68,
+              "w": 15,
+              "h": 30,
+              "bind": {
+                "pad": "BACK"
+              },
+              "hint": "pad Back"
+            },
+            {
+              "id": "nav_up",
+              "type": "button",
+              "label": "▲",
+              "x": 77,
+              "y": 2,
+              "w": 11,
+              "h": 30,
+              "bind": {
+                "key": "UP"
+              },
+              "hint": "Up"
+            },
+            {
+              "id": "nav_left",
+              "type": "button",
+              "label": "◀",
+              "x": 66,
+              "y": 35,
+              "w": 10.5,
+              "h": 30,
+              "bind": {
+                "key": "LEFT"
+              },
+              "hint": "Left"
+            },
+            {
+              "id": "nav_ok",
+              "type": "button",
+              "label": "OK",
+              "x": 77,
+              "y": 35,
+              "w": 11,
+              "h": 30,
+              "bind": {
+                "key": "ENTER"
+              },
+              "hint": "Enter",
+              "accent": "green"
+            },
+            {
+              "id": "nav_right",
+              "type": "button",
+              "label": "▶",
+              "x": 88.5,
+              "y": 35,
+              "w": 10.5,
+              "h": 30,
+              "bind": {
+                "key": "RIGHT"
+              },
+              "hint": "Right"
+            },
+            {
+              "id": "nav_back",
+              "type": "button",
+              "label": "Back",
+              "x": 66,
+              "y": 68,
+              "w": 10.5,
+              "h": 30,
+              "bind": {
+                "key": "BACKSPACE"
+              },
+              "hint": "Backspace"
+            },
+            {
+              "id": "nav_down",
+              "type": "button",
+              "label": "▼",
+              "x": 77,
+              "y": 68,
+              "w": 11,
+              "h": 30,
+              "bind": {
+                "key": "DOWN"
+              },
+              "hint": "Down"
+            },
+            {
+              "id": "nav_tab",
+              "type": "button",
+              "label": "Tab",
+              "x": 88.5,
+              "y": 68,
+              "w": 10.5,
+              "h": 30,
+              "bind": {
+                "key": "TAB"
+              },
+              "hint": "Tab"
+            }
+          ]
         }
       ]
     },
     {
-      "id": "drive_touch",
-      "name": "Drive (touch)",
+      "id": "buttonbox",
+      "type": "network",
+      "name": "Example: ESP32 button box on Wi-Fi (switch on with \"enabled\": true)",
+      "enabled": false,
       "controls": [
         {
-          "id": "t_brake",
-          "type": "pedal",
-          "label": "Brake",
-          "hint": "LT",
-          "x": 1,
-          "y": 26,
-          "w": 12,
-          "h": 72,
-          "bind": {
-            "axis": "LT"
-          },
-          "accent": "red"
-        },
-        {
-          "id": "t_gas",
-          "type": "pedal",
-          "label": "Gas",
-          "hint": "RT",
-          "x": 87,
-          "y": 26,
-          "w": 12,
-          "h": 72,
-          "bind": {
-            "axis": "RT"
-          },
-          "accent": "green"
-        },
-        {
-          "id": "t_lookback",
+          "id": "sw1",
           "type": "button",
-          "label": "Look back",
-          "x": 14.5,
-          "y": 2,
-          "w": 13.5,
-          "h": 30,
+          "label": "Engine",
           "bind": {
-            "pad": "RS"
-          },
-          "hint": "RS"
-        },
-        {
-          "id": "t_horn",
-          "type": "button",
-          "label": "Horn / Siren",
-          "x": 14.5,
-          "y": 35,
-          "w": 13.5,
-          "h": 30,
-          "bind": {
-            "pad": "LS"
-          },
-          "hint": "LS (tap: siren)",
-          "accent": "blue"
-        },
-        {
-          "id": "t_handbrake",
-          "type": "button",
-          "label": "Handbrake",
-          "x": 14.5,
-          "y": 68,
-          "w": 13.5,
-          "h": 30,
-          "bind": {
-            "pad": "RB"
-          },
-          "hint": "RB",
-          "accent": "amber"
-        },
-        {
-          "id": "t_cam",
-          "type": "button",
-          "label": "Camera",
-          "x": 1,
-          "y": 2,
-          "w": 12,
-          "h": 22,
-          "bind": {
-            "pad": "BACK"
-          },
-          "hint": "Back"
-        },
-        {
-          "id": "t_exit",
-          "type": "button",
-          "label": "Enter / Exit",
-          "x": 72,
-          "y": 2,
-          "w": 13.5,
-          "h": 22,
-          "bind": {
-            "pad": "Y"
-          },
-          "hint": "Y"
-        },
-        {
-          "id": "t_lights",
-          "type": "button",
-          "label": "Lights",
-          "x": 72,
-          "y": 26.5,
-          "w": 13.5,
-          "h": 22,
-          "bind": {
-            "pad": "DPAD_RIGHT"
-          },
-          "hint": "D-pad right"
-        },
-        {
-          "id": "t_radio",
-          "type": "button",
-          "label": "Radio",
-          "x": 72,
-          "y": 51,
-          "w": 13.5,
-          "h": 22,
-          "bind": {
-            "pad": "DPAD_LEFT"
-          },
-          "hint": "D-pad left"
-        },
-        {
-          "id": "t_phone",
-          "type": "button",
-          "label": "Phone",
-          "x": 72,
-          "y": 75.5,
-          "w": 13.5,
-          "h": 22.5,
-          "bind": {
-            "pad": "DPAD_UP"
-          },
-          "hint": "D-pad up"
-        },
-        {
-          "id": "t_pause",
-          "type": "button",
-          "label": "Pause",
-          "x": 87,
-          "y": 2,
-          "w": 12,
-          "h": 22,
-          "bind": {
-            "pad": "START"
-          },
-          "hint": "Start"
-        },
-        {
-          "id": "t_wheel",
-          "type": "wheel",
-          "label": "Drag to steer",
-          "mode": "touch",
-          "lock": 360,
-          "autocenter": true,
-          "x": 30,
-          "y": 1,
-          "w": 40,
-          "h": 77,
-          "bind": {
-            "axis": "LX"
-          },
-          "curve": {
-            "range": 180,
-            "deadzone": 2,
-            "anti_deadzone": 0.0,
-            "gamma": 1.0
+            "key": "F13"
           }
         },
         {
-          "id": "t_l_accept",
+          "id": "sw2",
           "type": "button",
-          "label": "Accept call",
-          "x": 30,
-          "y": 80,
-          "w": 9.25,
-          "h": 18,
+          "label": "Lights stage",
           "bind": {
-            "key": "Y"
-          },
-          "hint": "Y",
-          "accent": "green"
-        },
-        {
-          "id": "t_l_end",
-          "type": "button",
-          "label": "End call",
-          "x": 40.25,
-          "y": 80,
-          "w": 9.25,
-          "h": 18,
-          "bind": {
-            "key": "END"
-          },
-          "hint": "End",
-          "accent": "red"
-        },
-        {
-          "id": "t_l_stop",
-          "type": "button",
-          "label": "Traffic stop",
-          "x": 50.5,
-          "y": 80,
-          "w": 9.25,
-          "h": 18,
-          "bind": {
-            "key": "LSHIFT"
-          },
-          "hint": "L-Shift",
-          "accent": "blue"
-        },
-        {
-          "id": "t_l_backup",
-          "type": "button",
-          "label": "Backup",
-          "x": 60.75,
-          "y": 80,
-          "w": 9.25,
-          "h": 18,
-          "bind": {
-            "key": "B"
-          },
-          "hint": "B",
-          "accent": "blue"
-        }
-      ]
-    },
-    {
-      "id": "foot",
-      "name": "On foot",
-      "controls": [
-        {
-          "id": "ls",
-          "type": "stick",
-          "label": "Move",
-          "x": 2,
-          "y": 28,
-          "w": 27,
-          "h": 70,
-          "bind": {
-            "stick": "L"
-          },
-          "curve": {
-            "range": 1,
-            "deadzone": 0.1
+            "key": "F14"
           }
         },
         {
-          "id": "rs",
-          "type": "stick",
-          "label": "Look",
-          "x": 49,
-          "y": 28,
-          "w": 24,
-          "h": 70,
+          "id": "sw3",
+          "type": "button",
+          "label": "Spotlight",
           "bind": {
-            "stick": "R"
-          },
-          "curve": {
-            "range": 1,
-            "deadzone": 0.1,
-            "gamma": 1.4
+            "key": "F15"
           }
         },
         {
-          "id": "aim",
-          "type": "pedal",
-          "label": "Aim",
-          "hint": "LT",
-          "mode": "digital",
-          "x": 1,
-          "y": 2,
-          "w": 14,
-          "h": 23,
-          "bind": {
-            "axis": "LT"
-          }
-        },
-        {
-          "id": "weapons",
-          "type": "button",
-          "label": "Weapons",
-          "x": 16,
-          "y": 2,
-          "w": 12.5,
-          "h": 23,
-          "bind": {
-            "pad": "LB"
-          },
-          "hint": "LB (hold)"
-        },
-        {
-          "id": "back",
-          "type": "button",
-          "label": "Camera",
-          "x": 31,
-          "y": 2,
-          "w": 7.5,
-          "h": 23,
-          "bind": {
-            "pad": "BACK"
-          },
-          "hint": "Back"
-        },
-        {
-          "id": "start",
-          "type": "button",
-          "label": "Pause",
-          "x": 40,
-          "y": 2,
-          "w": 7.5,
-          "h": 23,
-          "bind": {
-            "pad": "START"
-          },
-          "hint": "Start"
-        },
-        {
-          "id": "cover",
-          "type": "button",
-          "label": "Cover",
-          "x": 71,
-          "y": 2,
-          "w": 13,
-          "h": 23,
-          "bind": {
-            "pad": "RB"
-          },
-          "hint": "RB"
-        },
-        {
-          "id": "shoot",
-          "type": "pedal",
-          "label": "Shoot",
-          "hint": "RT",
-          "mode": "digital",
-          "x": 85.5,
-          "y": 2,
-          "w": 13.5,
-          "h": 23,
-          "bind": {
-            "axis": "RT"
-          },
-          "accent": "red"
-        },
-        {
-          "id": "d_up",
-          "type": "button",
-          "label": "▲",
-          "x": 36.5,
-          "y": 30,
-          "w": 6,
-          "h": 21,
-          "bind": {
-            "pad": "DPAD_UP"
-          },
-          "hint": "Phone"
-        },
-        {
-          "id": "d_left",
-          "type": "button",
-          "label": "◀",
-          "x": 31,
-          "y": 53,
-          "w": 5.5,
-          "h": 21,
-          "bind": {
-            "pad": "DPAD_LEFT"
-          }
-        },
-        {
-          "id": "d_right",
-          "type": "button",
-          "label": "▶",
-          "x": 42.5,
-          "y": 53,
-          "w": 5.5,
-          "h": 21,
-          "bind": {
-            "pad": "DPAD_RIGHT"
-          }
-        },
-        {
-          "id": "d_down",
-          "type": "button",
-          "label": "▼",
-          "x": 36.5,
-          "y": 76,
-          "w": 6,
-          "h": 21,
-          "bind": {
-            "pad": "DPAD_DOWN"
-          },
-          "hint": "Character"
-        },
-        {
-          "id": "y",
-          "type": "button",
-          "label": "Y",
-          "x": 81,
-          "y": 28,
-          "w": 10,
-          "h": 22,
-          "bind": {
-            "pad": "Y"
-          },
-          "hint": "Enter car",
-          "accent": "amber"
-        },
-        {
-          "id": "x",
-          "type": "button",
-          "label": "X",
-          "x": 74.5,
-          "y": 52,
-          "w": 10,
-          "h": 22,
-          "bind": {
-            "pad": "X"
-          },
-          "hint": "Jump",
-          "accent": "blue"
-        },
-        {
-          "id": "b",
-          "type": "button",
-          "label": "B",
-          "x": 88,
-          "y": 52,
-          "w": 10.5,
-          "h": 22,
-          "bind": {
-            "pad": "B"
-          },
-          "hint": "Reload / melee",
-          "accent": "red"
-        },
-        {
-          "id": "a",
-          "type": "button",
-          "label": "A",
-          "x": 81,
-          "y": 76,
-          "w": 10,
-          "h": 22,
-          "bind": {
-            "pad": "A"
-          },
-          "hint": "Sprint",
-          "accent": "green"
-        }
-      ]
-    },
-    {
-      "id": "lspdfr",
-      "name": "LSPDFR",
-      "controls": [
-        {
-          "id": "accept",
-          "type": "button",
-          "label": "Accept callout",
-          "x": 1,
-          "y": 2,
-          "w": 15,
-          "h": 30,
-          "bind": {
-            "key": "Y"
-          },
-          "hint": "Y",
-          "accent": "green"
-        },
-        {
-          "id": "endcall",
-          "type": "button",
-          "label": "End callout",
-          "x": 17,
-          "y": 2,
-          "w": 15,
-          "h": 30,
-          "bind": {
-            "key": "END"
-          },
-          "hint": "End",
-          "accent": "red"
-        },
-        {
-          "id": "stop",
-          "type": "button",
-          "label": "Traffic stop",
-          "x": 33,
-          "y": 2,
-          "w": 15,
-          "h": 30,
-          "bind": {
-            "key": "LSHIFT"
-          },
-          "hint": "L-Shift (hold)",
-          "accent": "blue"
-        },
-        {
-          "id": "backup",
-          "type": "button",
-          "label": "Backup menu",
-          "x": 49,
-          "y": 2,
-          "w": 15,
-          "h": 30,
-          "bind": {
-            "key": "B"
-          },
-          "hint": "B",
-          "accent": "blue"
-        },
-        {
-          "id": "interact",
-          "type": "button",
-          "label": "Interact / Talk",
-          "x": 1,
-          "y": 35,
-          "w": 15,
-          "h": 30,
-          "bind": {
-            "key": "E"
-          },
-          "hint": "E",
-          "accent": "amber"
-        },
-        {
-          "id": "p_horn",
+          "id": "sw4",
           "type": "button",
           "label": "Siren",
-          "x": 17,
-          "y": 35,
-          "w": 15,
-          "h": 30,
           "bind": {
             "pad": "LS"
-          },
-          "hint": "pad LS (tap)"
+          }
         },
         {
-          "id": "p_exit",
-          "type": "button",
-          "label": "Enter / Exit",
-          "x": 33,
-          "y": 35,
-          "w": 15,
-          "h": 30,
+          "id": "pot",
+          "type": "pedal",
+          "label": "Hand throttle",
           "bind": {
-            "pad": "Y"
+            "axis": "RT"
           },
-          "hint": "pad Y"
-        },
-        {
-          "id": "p_lights",
-          "type": "button",
-          "label": "Lights",
-          "x": 49,
-          "y": 35,
-          "w": 15,
-          "h": 30,
-          "bind": {
-            "pad": "DPAD_RIGHT"
-          },
-          "hint": "pad D-pad right"
-        },
-        {
-          "id": "esc",
-          "type": "button",
-          "label": "Pause",
-          "x": 1,
-          "y": 68,
-          "w": 15,
-          "h": 30,
-          "bind": {
-            "key": "ESC"
-          },
-          "hint": "Esc"
-        },
-        {
-          "id": "console",
-          "type": "button",
-          "label": "RPH console",
-          "x": 17,
-          "y": 68,
-          "w": 15,
-          "h": 30,
-          "bind": {
-            "key": "F4"
-          },
-          "hint": "F4"
-        },
-        {
-          "id": "p_phone",
-          "type": "button",
-          "label": "Phone",
-          "x": 33,
-          "y": 68,
-          "w": 15,
-          "h": 30,
-          "bind": {
-            "pad": "DPAD_UP"
-          },
-          "hint": "pad D-pad up"
-        },
-        {
-          "id": "p_cam",
-          "type": "button",
-          "label": "Camera",
-          "x": 49,
-          "y": 68,
-          "w": 15,
-          "h": 30,
-          "bind": {
-            "pad": "BACK"
-          },
-          "hint": "pad Back"
-        },
-        {
-          "id": "nav_up",
-          "type": "button",
-          "label": "▲",
-          "x": 77,
-          "y": 2,
-          "w": 11,
-          "h": 30,
-          "bind": {
-            "key": "UP"
-          },
-          "hint": "Up"
-        },
-        {
-          "id": "nav_left",
-          "type": "button",
-          "label": "◀",
-          "x": 66,
-          "y": 35,
-          "w": 10.5,
-          "h": 30,
-          "bind": {
-            "key": "LEFT"
-          },
-          "hint": "Left"
-        },
-        {
-          "id": "nav_ok",
-          "type": "button",
-          "label": "OK",
-          "x": 77,
-          "y": 35,
-          "w": 11,
-          "h": 30,
-          "bind": {
-            "key": "ENTER"
-          },
-          "hint": "Enter",
-          "accent": "green"
-        },
-        {
-          "id": "nav_right",
-          "type": "button",
-          "label": "▶",
-          "x": 88.5,
-          "y": 35,
-          "w": 10.5,
-          "h": 30,
-          "bind": {
-            "key": "RIGHT"
-          },
-          "hint": "Right"
-        },
-        {
-          "id": "nav_back",
-          "type": "button",
-          "label": "Back",
-          "x": 66,
-          "y": 68,
-          "w": 10.5,
-          "h": 30,
-          "bind": {
-            "key": "BACKSPACE"
-          },
-          "hint": "Backspace"
-        },
-        {
-          "id": "nav_down",
-          "type": "button",
-          "label": "▼",
-          "x": 77,
-          "y": 68,
-          "w": 11,
-          "h": 30,
-          "bind": {
-            "key": "DOWN"
-          },
-          "hint": "Down"
-        },
-        {
-          "id": "nav_tab",
-          "type": "button",
-          "label": "Tab",
-          "x": 88.5,
-          "y": 68,
-          "w": 10.5,
-          "h": 30,
-          "bind": {
-            "key": "TAB"
-          },
-          "hint": "Tab"
+          "curve": {
+            "shape": "linear",
+            "deadzone": 0.03
+          }
         }
       ]
     }

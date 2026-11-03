@@ -14,10 +14,12 @@ Three safety rules live here:
 
 - Minimum hold time: games read the keyboard once per frame. A tap shorter than a frame (16 ms at
   60 fps) can be missed, so every key and button stays down for at least settings.min_hold_ms.
-- Watchdog: if no snapshot arrives for settings.watchdog_ms (Wi-Fi drop, phone screen off,
-  browser killed), everything is released. A car must never keep accelerating on its own.
-- Several controls may drive the same output (two buttons both bound to E). The output is held
-  while any of them is held; for axes, the value furthest from zero wins.
+- Watchdog: if a device sends no snapshot for settings.watchdog_ms (Wi-Fi drop, phone screen off,
+  browser killed), everything *that device* holds is released. A car must never keep accelerating
+  on its own.
+- Several devices (the phone, a button box) and several controls may drive the same output. The
+  controller keeps one snapshot per device and merges them: a button or key is held while any
+  control holds it; for axes, the value furthest from zero wins.
 """
 
 from __future__ import annotations
@@ -25,6 +27,7 @@ from __future__ import annotations
 import logging
 import math
 from collections.abc import Mapping
+from dataclasses import dataclass, field
 from typing import Any
 
 from .keys import press_order, release_order
@@ -45,36 +48,50 @@ def _pressed(value: Any) -> bool:
     return value is True or (isinstance(value, (int, float)) and not isinstance(value, bool) and value > 0)
 
 
+@dataclass
+class _Source:
+    """What one device currently wants, from its latest snapshot."""
+
+    buttons: set[str] = field(default_factory=set)
+    keys: set[str] = field(default_factory=set)
+    axes: dict[str, float] = field(default_factory=lambda: dict.fromkeys(AXES, 0.0))
+    last_input: float | None = None
+    timed_out: bool = False
+    layout: str | None = None
+
+
 class Controller:
     def __init__(self, profile: Profile, gamepad: GamepadSink, keyboard: KeyboardSink) -> None:
         self.profile = profile
         self._gamepad = gamepad
         self._keyboard = keyboard
+        self._sources: dict[str, _Source] = {}
+        self._axes: dict[str, float] = dict.fromkeys(AXES, 0.0)
         self._want_buttons: set[str] = set()
         self._want_keys: set[str] = set()
-        self._axes: dict[str, float] = dict.fromkeys(AXES, 0.0)
         self._buttons: set[str] = set()
         self._keys: set[str] = set()
         self._since: dict[str, float] = {}
         self._sent_pad: tuple | None = None
-        self._last_input: float | None = None
-        self._timed_out = False
         self._unknown: set[str] = set()
-        self.layout: str | None = None
 
     # -- input -------------------------------------------------------------------------------
 
-    def apply(self, values: Mapping[str, Any], now: float, layout: str | None = None) -> None:
-        """Take one snapshot {control_id: value} from the phone and update the outputs."""
+    def apply(self, device_id: str, values: Mapping[str, Any], now: float, layout: str | None = None) -> None:
+        """Take one snapshot {control_id: value} from a device and update the outputs."""
+        device = self.profile.devices.get(device_id)
+        if device is None:
+            return
+        src = self._sources.setdefault(device_id, _Source())
         buttons: set[str] = set()
         keys: set[str] = set()
         axes = dict.fromkeys(AXES, 0.0)
         for control_id, value in values.items():
-            control = self.profile.controls.get(control_id)
+            control = device.controls.get(control_id)
             if control is None:
-                if control_id not in self._unknown:
-                    self._unknown.add(control_id)
-                    log.warning("phone sent unknown control '%s' (ignored)", control_id)
+                if (device_id, control_id) not in self._unknown:
+                    self._unknown.add((device_id, control_id))
+                    log.warning("%s sent unknown control '%s' (ignored)", device_id, control_id)
                 continue
             if control.type == "button":
                 if _pressed(value):
@@ -91,14 +108,15 @@ class Controller:
                     ax, ay = STICKS[control.stick]
                     self._combine(axes, ax, sx)
                     self._combine(axes, ay, sy)
-        if layout != self.layout and layout is not None:
-            log.info("layout: %s", layout)
-            self.layout = layout
-        self._want_buttons, self._want_keys, self._axes = buttons, keys, axes
-        self._last_input = now
-        if self._timed_out:
-            log.info("input is back")
-            self._timed_out = False
+        if layout is not None and layout != src.layout:
+            log.info("%s layout: %s", device_id, layout)
+            src.layout = layout
+        src.buttons, src.keys, src.axes = buttons, keys, axes
+        src.last_input = now
+        if src.timed_out:
+            log.info("%s: input is back", device_id)
+            src.timed_out = False
+        self._merge()
         self._sync(now)
 
     @staticmethod
@@ -112,26 +130,43 @@ class Controller:
         if abs(value) > abs(axes[axis]):
             axes[axis] = value
 
+    def _merge(self) -> None:
+        self._want_buttons = set().union(*(s.buttons for s in self._sources.values()))
+        self._want_keys = set().union(*(s.keys for s in self._sources.values()))
+        axes = dict.fromkeys(AXES, 0.0)
+        for src in self._sources.values():
+            for axis, value in src.axes.items():
+                if abs(value) > abs(axes[axis]):
+                    axes[axis] = value
+        self._axes = axes
+
     # -- time ----------------------------------------------------------------------------------
 
     def tick(self, now: float) -> None:
-        """Call often (every ~10 ms): finishes deferred releases and runs the watchdog."""
+        """Call often (every ~10 ms): finishes deferred releases and runs the watchdogs."""
         watchdog = self.profile.settings.watchdog_ms / 1000.0
-        if self._last_input is not None and not self._timed_out and now - self._last_input > watchdog:
-            log.warning("no input from the phone for %.0f ms: releasing everything", watchdog * 1000)
-            self._timed_out = True
-            self._clear_wants()
+        changed = False
+        for device_id, src in self._sources.items():
+            if src.last_input is not None and not src.timed_out and now - src.last_input > watchdog:
+                log.warning("no input from %s for %.0f ms: releasing everything it holds", device_id, watchdog * 1000)
+                src.timed_out = True
+                self._clear(src)
+                changed = True
+        if changed:
+            self._merge()
         self._sync(now)
 
-    def neutralize(self, now: float) -> None:
-        """Release everything (phone disconnected). Minimum hold times still apply."""
-        self._clear_wants()
-        self._last_input = None
+    def neutralize(self, device_id: str, now: float) -> None:
+        """Release everything a device holds (it disconnected). Minimum hold times still apply."""
+        src = self._sources.pop(device_id, None)
+        if src is not None:
+            self._merge()
         self._sync(now)
 
     def release_all_now(self) -> None:
         """Release everything immediately, ignoring hold times (shutdown)."""
-        self._clear_wants()
+        self._sources.clear()
+        self._merge()
         for key in release_order(self._keys):
             self._keyboard.key(key, False)
         self._keys.clear()
@@ -139,10 +174,9 @@ class Controller:
         self._since.clear()
         self._send_pad()
 
-    def _clear_wants(self) -> None:
-        self._want_buttons = set()
-        self._want_keys = set()
-        self._axes = dict.fromkeys(AXES, 0.0)
+    @staticmethod
+    def _clear(src: _Source) -> None:
+        src.buttons, src.keys, src.axes = set(), set(), dict.fromkeys(AXES, 0.0)
 
     # -- output --------------------------------------------------------------------------------
 
@@ -177,6 +211,7 @@ class Controller:
     def outputs(self) -> dict[str, Any]:
         """What is being sent right now (shown on the phone for tuning)."""
         return {
+            "devices": sorted(d for d, s in self._sources.items() if not s.timed_out),
             "buttons": sorted(self._buttons),
             "keys": sorted(self._keys),
             "axes": {a: round(v, 3) for a, v in self._axes.items()},

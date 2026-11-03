@@ -1,7 +1,8 @@
 """Command line: `python -m stusteer run`, `python -m stusteer check`.
 
     run      start the receiver (add --dry-run first: it only logs, nothing reaches the game)
-    check    report what is installed and what the phone should open
+    check    report what is installed, the profile's devices and what the phone should open
+    keys     list every key name a button can press
 """
 
 from __future__ import annotations
@@ -45,6 +46,8 @@ def main(argv: list[str] | None = None) -> int:
     check = sub.add_parser("check", help="check the setup")
     check.add_argument("--profile", type=Path, default=DEFAULT_PROFILE)
 
+    sub.add_parser("keys", help="list every key name a button can press")
+
     args = parser.parse_args(argv)
     logging.basicConfig(
         level=logging.DEBUG if getattr(args, "verbose", False) else logging.INFO,
@@ -54,27 +57,58 @@ def main(argv: list[str] | None = None) -> int:
     )
     if args.command == "check":
         return _check(args)
+    if args.command == "keys":
+        return _keys()
     return _run(args)
 
 
-def _make_sinks(dry_run: bool, targets: tuple[str, ...]):
-    if dry_run:
-        from .output.dryrun import DryRunGamepad, DryRunKeyboard
+def _keys() -> int:
+    from .keys import ALIASES, KEYS
 
-        return DryRunGamepad(), DryRunKeyboard()
+    groups: dict[str, list[str]] = {"keys": [], "media keys (virtual-key only)": [], "mouse buttons": []}
+    for name, spec in KEYS.items():
+        group = {"key": "keys", "vk": "media keys (virtual-key only)", "mouse": "mouse buttons"}[spec.kind]
+        groups[group].append(name)
+    for title, names in groups.items():
+        print(f"{title}:")
+        line = "   "
+        for name in names:
+            if len(line) + len(name) > 96:
+                print(line)
+                line = "   "
+            line += " " + name
+        print(line)
+    print("aliases: " + ", ".join(f"{a}={k}" for a, k in ALIASES.items()))
+    print("raw codes: SC:0x64 (scan code), SC:0xE05F (with the E0 prefix), VK:0x7E (virtual-key code)")
+    print("combinations: a list, e.g. \"bind\": {\"key\": [\"LCTRL\", \"F13\"]}")
+    return 0
+
+
+def _make_sinks(dry_run: bool, outputs):
+    from .output.dryrun import DryRunGamepad, DryRunKeyboard, NullGamepad
+
+    if dry_run:
+        return (DryRunGamepad() if outputs.gamepad != "none" else NullGamepad()), DryRunKeyboard()
     if sys.platform != "win32":
         raise SystemExit("Real output needs Windows. Use --dry-run here.")
+    if outputs.gamepad == "none":
+        gamepad = NullGamepad()
+    else:
+        gamepad = _vigem()
+    from .output.keyboard_win import WindowsKeyboard
+
+    return gamepad, WindowsKeyboard(outputs.key_targets)
+
+
+def _vigem():
     try:
         from .output.gamepad_vigem import VigemGamepad
 
-        gamepad = VigemGamepad()
+        return VigemGamepad()
     except ImportError:
         raise SystemExit("The 'vgamepad' package is missing: pip install vgamepad (see README).") from None
     except Exception as exc:  # vgamepad raises a plain Exception when ViGEmBus is not installed
         raise SystemExit(f"Could not create the virtual Xbox pad ({exc}). Is the ViGEmBus driver installed?") from exc
-    from .output.keyboard_win import WindowsKeyboard
-
-    return gamepad, WindowsKeyboard(targets)
 
 
 def _ssl_context(folder: Path, addresses: list[str]) -> ssl.SSLContext:
@@ -98,12 +132,12 @@ def _run(args) -> int:
         print(exc, file=sys.stderr)
         return 2
     if args.any_window:
-        profile.settings.key_target_processes = ()
+        profile.outputs.key_targets = ()
     folder = app_dir()
     pin = args.pin or load_pin(folder, regenerate=args.new_pin)
     addresses = lan_addresses()
     context = None if args.http else _ssl_context(folder, addresses)
-    gamepad, keyboard = _make_sinks(args.dry_run, profile.settings.key_target_processes)
+    gamepad, keyboard = _make_sinks(args.dry_run, profile.outputs)
     controller = Controller(profile, gamepad, keyboard)
     receiver = Receiver(
         controller, pin, TuningStore(folder, args.profile.stem), PACKAGE_DIR / "web",
@@ -111,13 +145,17 @@ def _run(args) -> int:
     )
 
     scheme = "http" if args.http else "https"
-    targets = ", ".join(profile.settings.key_target_processes) or "any window"
+    targets = ", ".join(profile.outputs.key_targets) or "any window"
+    pad = "virtual Xbox 360 pad" if profile.outputs.gamepad == "xbox360" else "no gamepad"
     print()
     print(f"  STUSteer {__version__}   profile: {profile.name}")
     if args.dry_run:
         print("  DRY RUN: nothing is sent to the game, the output is only logged.")
     else:
-        print(f"  Output: virtual Xbox 360 pad + keyboard (keys only while {targets} has focus)")
+        print(f"  Output: {pad} + keyboard/mouse (presses only while {targets} has focus)")
+    for device in profile.devices.values():
+        state = "enabled" if device.enabled else "disabled"
+        print(f"  Device {device.id} ({device.type}, {state}): {device.name}")
     print("  On the phone (same Wi-Fi), open:")
     for address in addresses or ["<this PC's IP address>"]:
         print(f"      {scheme}://{address}:{args.port}")
@@ -158,7 +196,10 @@ def _check(args) -> int:
     print(f"STUSteer {__version__} on {platform.system()} {platform.release()}, Python {platform.python_version()}")
     try:
         profile = load_profile(args.profile)
-        line(True, f"profile {args.profile.name}: {len(profile.layouts)} layouts, {len(profile.controls)} controls")
+        line(True, f"profile {args.profile.name}: outputs {profile.outputs.gamepad} pad + keyboard")
+        for device in profile.devices.values():
+            state = "enabled" if device.enabled else "disabled"
+            print(f"       device {device.id}: {device.type}, {len(device.controls)} controls, {state}")
     except (OSError, ProfileError) as exc:
         line(False, f"profile: {exc}")
     try:
